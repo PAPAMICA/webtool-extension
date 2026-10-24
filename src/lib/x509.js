@@ -1,5 +1,5 @@
-/* Parseur DER minimal pour extraire d'un certificat X.509 les informations
- * que webRequest.getSecurityInfo() ne fournit pas directement. */
+/* Minimal DER parser to extract X.509 certificate details
+ * that webRequest.getSecurityInfo() does not provide directly. */
 (() => {
   const OIDS = {
     "1.2.840.113549.1.1.1": "RSA",
@@ -151,7 +151,7 @@
               break;
           }
         } catch (e) {
-          /* extension malformée : on l'ignore */
+          /* malformed extension: skip */
         }
       }
     }

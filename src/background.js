@@ -1,6 +1,6 @@
-/* Collecte, par onglet, des informations sur la navigation principale :
- * en-têtes, IP réellement contactée, chaîne de redirection, infos TLS
- * et signaux transmis par le content script pour la détection des technos. */
+/* Per-tab collection for the main navigation:
+ * headers, contacted IP, redirect chain, TLS info,
+ * and signals from the content script for technology detection. */
 
 const tabs = new Map();
 const pendingScans = new Map();
@@ -140,7 +140,7 @@ async function runDetection(tabId) {
   try {
     for (const c of await browser.cookies.getAll({ url: s.url || r.url })) cookies[c.name] = c.value;
   } catch (e) {
-    /* URL non compatible avec l'API cookies */
+    /* URL not compatible with the cookies API */
   }
   r.techs = WT_detect({
     ...s,

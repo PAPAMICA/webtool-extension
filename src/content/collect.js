@@ -1,5 +1,5 @@
-/* Relève dans la page les signaux utiles à la détection des technologies
- * (variables globales, DOM, meta, scripts…) et les envoie au background. */
+/* Collect page signals for technology detection
+ * (globals, DOM, meta, scripts…) and send them to the background. */
 (() => {
   if (globalThis.__wtCollect) {
     globalThis.__wtCollect();

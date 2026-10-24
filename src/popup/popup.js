@@ -24,7 +24,21 @@ const SECURITY_HEADERS = [
 ];
 const LEAK_HEADERS = ["server", "x-powered-by", "x-aspnet-version", "x-aspnetmvc-version", "x-generator", "x-drupal-cache", "x-runtime", "via"];
 
-// ───────────── Utilitaires DOM ─────────────
+/* Keep labels in the popup so Tech tab stays English even with a stale background cache. */
+const CAT_LABELS = {
+  cms: "CMS", headless: "Headless CMS", ecommerce: "Ecommerce", ssg: "Static site generator",
+  wpplugin: "WordPress plugin", wptheme: "WordPress theme", jsfw: "JS framework", mobile: "Mobile / hybrid",
+  jslib: "JS library", editor: "Rich editor", graphics: "Graphics / 3D", ui: "UI / CSS framework",
+  webfw: "Web framework", lang: "Language", db: "Database", os: "Operating system", server: "Web server",
+  proxy: "Reverse proxy / Load balancer", cdn: "CDN", paas: "Hosting / PaaS", panel: "Hosting panel",
+  security: "Security / WAF", ca: "Certificate authority", analytics: "Analytics", tagmgr: "Tag manager",
+  abtest: "A/B testing", ads: "Ads / pixels", marketing: "Marketing / CRM", chat: "Support / chat",
+  consent: "Cookie consent", payment: "Payment", monitoring: "Monitoring / RUM", search: "Search",
+  fonts: "Fonts / icons", media: "Video / media", maps: "Maps", build: "Build / bundler", misc: "Misc",
+};
+const catLabel = (t) => CAT_LABELS[t.cat] || t.catLabel || t.cat;
+
+// ───────────── DOM helpers ─────────────
 function h(tag, props, ...kids) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(props || {})) {
@@ -94,7 +108,7 @@ const loading = (msg = "Loading…") => h("div", { class: "loading" }, h("span",
 const errorLine = (msg) => h("div", { class: "notice bad" }, msg);
 const pill = (text, kind = "", title) => h("span", { class: `pill ${kind}`, title }, h("span", { class: "dot" }), text);
 
-// ───────────── Formatage ─────────────
+// ───────────── Formatting ─────────────
 const DAY = 86400000;
 
 function fmtDate(d) {
@@ -168,7 +182,7 @@ function currentGeo() {
   return info && !info.loading && !info.geo?.error ? info.geo : null;
 }
 
-// ───────────── Rendu : en-tête ─────────────
+// ───────────── Render: hero ─────────────
 function renderHero() {
   const r = state.record;
   const pills = [];
@@ -199,7 +213,7 @@ function renderHero() {
   document.getElementById("count-tech").textContent = state.techs?.length || "";
 }
 
-// ───────────── Rendu : aperçu ─────────────
+// ───────────── Render: overview ─────────────
 function renderOverview() {
   const panel = document.getElementById("panel-overview");
   const g = currentGeo();
@@ -251,7 +265,7 @@ function renderOverview() {
         h("div", { class: "muted small" }, `Issued by ${issuer.O?.[0] || dnName(leaf.issuer)}`)),
       kv("Expires", h("span", { class: left < 0 ? "bad" : left < 15 ? "bad" : left < 30 ? "warn" : "ok" }, `${fmtDate(leaf.validity.end)} (${left < 0 ? "expired" : left + "d"})`), { raw: true }),
       kv("Protocol", [sec.protocolVersion, sec.keaGroupName].filter(Boolean).join(" · "), { copyable: false }),
-      kv("SAN", leaf.parsed?.san?.length ? `${leaf.parsed.san.length} nom${leaf.parsed.san.length > 1 ? "s" : ""}` : null, { copyable: false }),
+      kv("SAN", leaf.parsed?.san?.length ? `${leaf.parsed.san.length} name${leaf.parsed.san.length > 1 ? "s" : ""}` : null, { copyable: false }),
     ];
   }
   const certCard = card("Certificate", certBody, { ico: "🔒" });
@@ -262,7 +276,7 @@ function renderOverview() {
   else {
     const shown = state.techs.filter((t) => !t.implied).slice(0, 18);
     techBody = h("div", { class: "chips" },
-      shown.map((t) => h("span", { class: "chip", title: t.catLabel },
+      shown.map((t) => h("span", { class: "chip", title: catLabel(t) },
         h("i", { style: `width:7px;height:7px;border-radius:2px;background:${t.color}` }), t.name, t.version ? h("span", { class: "ver" }, t.version) : null)),
       state.techs.length > shown.length ? h("span", { class: "chip click", onclick: () => switchTab("tech") }, `+${state.techs.length - shown.length} …`) : null);
   }
@@ -326,13 +340,13 @@ function whoisFallbackLink() {
   return h("div", { style: "margin-top:6px" }, ext(`https://who.is/whois/${encodeURIComponent(registrable(state.host))}`, "View WHOIS on who.is ↗"));
 }
 
-// ───────────── Rendu : technologies ─────────────
+// ───────────── Render: technologies ─────────────
 function renderTech() {
   const panel = document.getElementById("panel-tech");
   const actions = h("div", { style: "display:flex;gap:6px" },
     state.techs?.length ? h("button", {
       class: "btn",
-      onclick: () => copy(state.techs.map((t) => `${t.name}${t.version ? " " + t.version : ""} — ${t.catLabel}`).join("\n")),
+      onclick: () => copy(state.techs.map((t) => `${t.name}${t.version ? " " + t.version : ""} — ${catLabel(t)}`).join("\n")),
     }, "Copy list") : null,
     h("button", { class: "btn", onclick: () => doRescan() }, state.scanning ? "Scanning…" : "Rescan"));
 
@@ -353,7 +367,7 @@ function renderTech() {
 
   const body = [...groups.values()].map((items) =>
     h("div", { class: "tech-group" },
-      h("div", { class: "tech-cat" }, h("i", { style: `background:${items[0].color}` }), items[0].catLabel),
+      h("div", { class: "tech-cat" }, h("i", { style: `background:${items[0].color}` }), catLabel(items[0])),
       items.map((t) =>
         h("div", { class: "tech" },
           h("div", { class: "avatar", style: `background:${t.color}26;color:${t.color}` }, t.name.replace(/[^A-Za-z0-9]/g, "").slice(0, 2) || "?"),
@@ -367,7 +381,7 @@ function renderTech() {
   panel.replaceChildren(card(`${state.techs.length} technologies`, body, { flush: true, extra: actions }));
 }
 
-// ───────────── Rendu : IP / ASN ─────────────
+// ───────────── Render: IP / ASN ─────────────
 function renderIp() {
   const panel = document.getElementById("panel-ip");
   const d = state.dns;
@@ -456,7 +470,7 @@ function allIps() {
   return list;
 }
 
-// ───────────── Rendu : domaine ─────────────
+// ───────────── Render: domain ─────────────
 function renderDomain() {
   const panel = document.getElementById("panel-domain");
   const out = [];
@@ -520,7 +534,7 @@ function renderDomain() {
   panel.replaceChildren(...out);
 }
 
-// ───────────── Rendu : certificat ─────────────
+// ───────────── Render: certificate ─────────────
 function renderCert() {
   const panel = document.getElementById("panel-cert");
   const r = state.record;
@@ -635,7 +649,7 @@ function downloadPem(pem) {
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
-// ───────────── Rendu : en-têtes ─────────────
+// ───────────── Render: headers ─────────────
 function renderHeaders() {
   const panel = document.getElementById("panel-headers");
   const r = state.record;

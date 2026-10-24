@@ -15,14 +15,16 @@
   const FILE_RE = /\/([a-z][a-z0-9_.-]*?)[.-]v?(\d+\.\d+(?:\.\d+)?(?:-(?:alpha|beta|rc)\.?\d*)?)(?:[.-](?:min|slim|bundle|umd|esm|prod|production|full|pack|all))*\.(?:m?js|css)(?:[?#]|$)/i;
   const QUERY_RE = /\/([a-z][a-z0-9_.-]*?)(?:[.-](?:min|slim|bundle|umd|esm|prod|production|full|pack|all))*\.(?:m?js|css)\?(?:[^#]*&)?(?:ver|v|version)=v?(\d+(?:\.\d+)+)/i;
   const WP_RE = /\/wp-content\/(plugins|themes|mu-plugins)\/([A-Za-z0-9_.-]+)\/[^?#]*(?:\?(?:[^#]*&)?ver=([\w.-]+))?/;
-  const NO_ALIAS_CATS = new Set(["lang", "server", "proxy", "cdn", "paas", "os", "db", "ca", "panel", "security"]);
+  const NO_ALIAS_CATS = new Set(["lang", "server", "proxy", "cdn", "paas", "os", "db", "ca", "panel", "security", "cms", "headless", "ecommerce", "ssg", "wpplugin", "wptheme"]);
   const GENERIC_HEADERS = { server: "server", "x-powered-by": "webfw", "x-generator": "cms", "x-server": "server" };
+  /* Cache-busting hashes sometimes start with digits (e.g. 66c613f…) — reject digit-only "versions". */
+  const HASHISH = /^(?:[0-9a-f]{8,}|[0-9]{2,}[a-f][0-9a-f]+)$/i;
 
   function cleanVersion(v) {
     if (v == null) return null;
     v = String(v).trim().replace(/^v/i, "");
-    if (!/^\d/.test(v) || v.length > 24 || !/^[\w.+-]+$/.test(v)) return null;
-    if (/^\d{5,}$/.test(v) || /^\d{8,}/.test(v)) return null;
+    if (!/^\d/.test(v) || v.length > 32 || !/^[\w.+-]+$/.test(v)) return null;
+    if (/^\d{5,}$/.test(v) || /^\d{8,}/.test(v) || HASHISH.test(v)) return null;
     return v;
   }
 
@@ -64,10 +66,10 @@
     slug.replace(/[-_]+/g, " ").replace(/\b([a-z])/g, (c) => c.toUpperCase()).trim();
 
   /**
-   * @param {object} s signaux collectés
-   *   headers : { nom: valeur }        cookies : { nom: valeur }
-   *   meta    : { nom: [valeurs] }     js      : { clé: valeur|"" }
-   *   dom     : { sélecteur: true }    src     : [urls]
+   * @param {object} s collected signals
+   *   headers : { name: value }        cookies : { name: value }
+   *   meta    : { name: [values] }     js      : { key: value|"" }
+   *   dom     : { selector: true }     src     : [urls]
    *   html    : string                 url     : string
    *   certIssuer : string
    */
@@ -171,7 +173,7 @@
       }
     }
 
-    // ── Versions et bibliothèques depuis les URL (CDN, noms de fichiers, ?ver=) ──
+    // ── Versions and libraries from URLs (CDN, filenames, ?ver=) ──
     const wpAssets = new Map();
     for (const u of src) {
       let hit = false;
@@ -203,7 +205,7 @@
       }
     }
 
-    // ── Plugins et thèmes WordPress ──
+    // ── WordPress plugins and themes ──
     if (wpAssets.size) {
       const wpVersion = found.get("WordPress")?.version;
       for (const [key, counts] of wpAssets) {
@@ -223,7 +225,7 @@
       }
     }
 
-    // ── En-têtes et meta generator non reconnus ──
+    // ── Unrecognized headers and meta generator ──
     const known = (name) => found.has(name) || idx.lowerNames.has(name.toLowerCase()) && found.has(idx.lowerNames.get(name.toLowerCase()));
     for (const [h, cat] of Object.entries(GENERIC_HEADERS)) {
       const value = headers[h];
@@ -267,6 +269,8 @@
       }
     }
 
+    enrichPhpVersion(found, headers, html);
+
     const order = Object.keys(categories);
     return [...found.values()]
       .filter((f) => f.confidence >= 25)
@@ -283,6 +287,88 @@
         };
       })
       .sort((a, b) => order.indexOf(a.cat) - order.indexOf(b.cat) || a.name.localeCompare(b.name));
+  }
+
+  /**
+   * Pull a PHP version from every available signal.
+   * Many hosts put it in Server / X-Powered-By / custom headers; CMS stacks often
+   * only imply PHP with no version — this pass fills the gap when the server leaks it.
+   */
+  const PHP_VER = /\bPHP[\/ ]+v?(\d+\.\d+(?:\.\d+)?)/gi;
+  const PHP_HEADER_KEYS = /^(?:x-powered-by|server|x-php-version|x-powered-php|php-version|x-cf-powered-by|x-generator|x-runtime|via)$/i;
+  const PHP_BARE = /^(\d+\.\d+(?:\.\d+)?)$/;
+
+  function betterPhpVersion(a, b) {
+    if (!a) return b;
+    if (!b) return a;
+    if (b.startsWith(a + ".") || (b.startsWith(a) && b.length > a.length)) return b;
+    if (a.startsWith(b + ".") || (a.startsWith(b) && a.length > b.length)) return a;
+    const sa = a.split(".").length;
+    const sb = b.split(".").length;
+    if (sb !== sa) return sb > sa ? b : a;
+    return a;
+  }
+
+  function enrichPhpVersion(found, headers, html) {
+    let version = found.get("PHP")?.version || null;
+    let via = null;
+
+    for (const [name, value] of Object.entries(headers || {})) {
+      if (value == null || value === "") continue;
+      const text = String(value);
+      if (PHP_HEADER_KEYS.test(name) || /php/i.test(text) || /php/i.test(name)) {
+        PHP_VER.lastIndex = 0;
+        let m;
+        while ((m = PHP_VER.exec(text))) {
+          const v = cleanVersion(m[1]);
+          if (!v) continue;
+          const next = betterPhpVersion(version, v);
+          if (next !== version) {
+            version = next;
+            via = "header";
+          }
+        }
+        if (/^(?:x-php-version|x-powered-php|php-version)$/i.test(name)) {
+          const bare = PHP_BARE.exec(text.trim());
+          if (bare) {
+            const v = cleanVersion(bare[1]);
+            const next = betterPhpVersion(version, v);
+            if (next !== version) {
+              version = next;
+              via = "header";
+            }
+          }
+        }
+      }
+    }
+
+    if (html) {
+      PHP_VER.lastIndex = 0;
+      let m;
+      while ((m = PHP_VER.exec(html.slice(0, 200000)))) {
+        const v = cleanVersion(m[1]);
+        if (!v) continue;
+        const next = betterPhpVersion(version, v);
+        if (next !== version) {
+          version = next;
+          via = via || "html";
+        }
+      }
+    }
+
+    if (!version && !found.has("PHP")) return;
+
+    if (!found.has("PHP")) {
+      found.set("PHP", { name: "PHP", version, via: [via || "header"], confidence: 100, vprio: PRIO[via] || 4 });
+      return;
+    }
+
+    const php = found.get("PHP");
+    if (version && (!php.version || betterPhpVersion(php.version, version) === version)) {
+      php.version = version;
+      php.vprio = Math.max(php.vprio || 0, PRIO[via] || 4);
+      if (via && !php.via.includes(via)) php.via.push(via);
+    }
   }
 
   globalThis.WT_detect = detect;

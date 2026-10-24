@@ -1,24 +1,24 @@
 /*
- * Signatures de détection des technologies.
+ * Technology detection signatures.
  *
- * Chaque entrée peut contenir :
- *   cat      : clé de catégorie (voir `categories`)
- *   w        : site officiel
- *   headers  : { "nom-en-tete": motif }
- *   cookies  : { "nom": motif }                    (suffixe "*" = préfixe)
- *   meta     : { "name|property": motif }
- *   js       : { "chemin.global": motif }          présence = détection, RegExp = version
- *              les clés commençant par "@" sont des sondes spéciales (voir collect.js)
- *   dom      : [ sélecteur | W(sélecteur) ]
- *   src      : [ motif ]  testés sur les URL des scripts / styles / ressources chargées
- *   html     : [ motif ]  testés sur le HTML de la page
- *   url      : motif testé sur l'URL de la page
- *   npm      : [ noms de paquets ]  pour lire la version dans les URL de CDN et les noms de fichiers
- *   implies  : [ autres technologies ]
+ * Each entry may include:
+ *   cat      : category key (see `categories`)
+ *   w        : official website
+ *   headers  : { "header-name": pattern }
+ *   cookies  : { "name": pattern }                 ("*" suffix = prefix match)
+ *   meta     : { "name|property": pattern }
+ *   js       : { "global.path": pattern }          presence = detect, RegExp = version
+ *              keys starting with "@" are special probes (see collect.js)
+ *   dom      : [ selector | W(selector) ]
+ *   src      : [ pattern ] tested against script / style / resource URLs
+ *   html     : [ pattern ] tested against page HTML
+ *   url      : pattern tested against the page URL
+ *   npm      : [ package names ] to read versions from CDN URLs and filenames
+ *   implies  : [ other technologies ]
  *
- * Un motif est une RegExp (1er groupe capturant = version), "" (simple présence) ou null.
- *   W(motif, c)        : signal faible, confiance c% (50 par défaut)
- *   V(motif, version)  : version fixe quand le motif correspond
+ * A pattern is a RegExp (1st capture group = version), "" (presence only), or null.
+ *   W(pattern, c)      : weak signal, confidence c% (default 50)
+ *   V(pattern, version): fixed version when the pattern matches
  */
 (() => {
   const W = (v, c = 50) => ({ v, c });
@@ -27,17 +27,17 @@
   globalThis.WT_DB = {
     categories: {
       cms: ["CMS", "#8b5cf6"],
-      headless: ["CMS headless", "#a78bfa"],
-      ecommerce: ["E-commerce", "#ec4899"],
+      headless: ["Headless CMS", "#a78bfa"],
+      ecommerce: ["Ecommerce", "#ec4899"],
       ssg: ["Static site generator", "#a855f7"],
       wpplugin: ["WordPress plugin", "#7c3aed"],
       wptheme: ["WordPress theme", "#6d28d9"],
-      jsfw: ["Framework JS", "#22d3ee"],
+      jsfw: ["JS framework", "#22d3ee"],
       mobile: ["Mobile / hybrid", "#67e8f9"],
       jslib: ["JS library", "#38bdf8"],
       editor: ["Rich editor", "#7dd3fc"],
       graphics: ["Graphics / 3D", "#60a5fa"],
-      ui: ["Framework UI / CSS", "#f472b6"],
+      ui: ["UI / CSS framework", "#f472b6"],
       webfw: ["Web framework", "#f59e0b"],
       lang: ["Language", "#eab308"],
       db: ["Database", "#64748b"],
@@ -52,21 +52,21 @@
       analytics: ["Analytics", "#f97316"],
       tagmgr: ["Tag manager", "#fb923c"],
       abtest: ["A/B testing", "#fdba74"],
-      ads: ["Ads / Pixels", "#f87171"],
+      ads: ["Ads / pixels", "#f87171"],
       marketing: ["Marketing / CRM", "#e11d48"],
-      chat: ["Support / Chat", "#84cc16"],
+      chat: ["Support / chat", "#84cc16"],
       consent: ["Cookie consent", "#a3e635"],
       payment: ["Payment", "#22c55e"],
       monitoring: ["Monitoring / RUM", "#f43f5e"],
       search: ["Search", "#2dd4bf"],
-      fonts: ["Fonts / Icons", "#c084fc"],
-      media: ["Video / Media", "#fb7185"],
+      fonts: ["Fonts / icons", "#c084fc"],
+      media: ["Video / media", "#fb7185"],
       maps: ["Maps", "#4ade80"],
-      build: ["Build / Bundler", "#94a3b8"],
+      build: ["Build / bundler", "#94a3b8"],
       misc: ["Misc", "#9ca3af"],
     },
 
-    /* slug WordPress (plugin ou thème) → nom affiché */
+    /* WordPress slug (plugin or theme) → display name */
     wpSlugs: {
       elementor: "Elementor", "elementor-pro": "Elementor Pro", woocommerce: "WooCommerce",
       "contact-form-7": "Contact Form 7", jetpack: "Jetpack", "sitepress-multilingual-cms": "WPML",
@@ -92,7 +92,7 @@
       "wp-mail-smtp": "WP Mail SMTP", "redirection": "Redirection", "really-simple-ssl": "Really Simple SSL",
       "updraftplus": "UpdraftPlus", "under-construction-page": "Under Construction", "coming-soon": "SeedProd",
       "astra-sites": "Starter Templates", "astra-addon": "Astra Pro", "oxygen": "Oxygen Builder", "bricks": "Bricks Builder",
-      // thèmes
+      // themes
       Divi: "Divi", Extra: "Extra", astra: "Astra", generatepress: "GeneratePress", oceanwp: "OceanWP", Avada: "Avada",
       enfold: "Enfold", "hello-elementor": "Hello Elementor", kadence: "Kadence", flatsome: "Flatsome", betheme: "BeTheme",
       salient: "Salient", bridge: "Bridge", "dt-the7": "The7", neve: "Neve", storefront: "Storefront", blocksy: "Blocksy",
@@ -104,12 +104,16 @@
       // ═════════════ CMS ═════════════
       WordPress: {
         cat: "cms", w: "https://wordpress.org",
-        meta: { generator: /^WordPress ?([\d.]+)?/i },
+        /* Version must look like 6.4 / 6.4.2 / 7.2-beta1-64690 — never a cache-busting hash (66c613f…). */
+        meta: { generator: /^WordPress(?:\s+(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?(?:-[a-zA-Z][\w.-]*)?))?/i },
         src: [
-          /\/wp-includes\/(?:css\/dist\/block-library\/style(?:\.min)?\.css|js\/wp-emoji-release\.min\.js|css\/dashicons(?:\.min)?\.css|js\/comment-reply(?:\.min)?\.js|css\/admin-bar(?:\.min)?\.css)\?ver=([\d.]+)/,
+          /\/wp-includes\/(?:css\/dist\/block-library\/style(?:\.min)?\.css|js\/wp-emoji-release\.min\.js|css\/dashicons(?:\.min)?\.css|js\/comment-reply(?:\.min)?\.js|css\/admin-bar(?:\.min)?\.css)\?ver=(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?(?:-[a-zA-Z][\w.-]*)?)(?:[&"']|$)/i,
           /\/wp-(?:content|includes)\//,
         ],
-        html: [/wp-emoji-release\.min\.js\?ver=([\d.]+)/, /<link[^>]+\/wp-json\//i],
+        html: [
+          /wp-emoji-release\.min\.js\?ver=(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?(?:-[a-zA-Z][\w.-]*)?)(?:[&"']|$)/i,
+          /<link[^>]+\/wp-json\//i,
+        ],
         cookies: { "wp-settings-*": "", "wordpress_logged_in_*": "", "wordpress_test_cookie": "" },
         headers: { link: /rel="https:\/\/api\.w\.org\/"/, "x-pingback": /\/xmlrpc\.php/ },
         implies: ["PHP", "MySQL"],
@@ -155,7 +159,7 @@
       "Adobe Experience Manager": { cat: "cms", w: "https://business.adobe.com/products/experience-manager", src: [/\/etc\.clientlibs\//], html: [/\/content\/dam\//], implies: ["Java"] },
       Sitecore: { cat: "cms", w: "https://www.sitecore.com", cookies: { SC_ANALYTICS_GLOBAL_COOKIE: "" }, html: [/\/-\/media\//], implies: ["Microsoft ASP.NET"] },
 
-      // ═════════════ CMS headless ═════════════
+      // ═════════════ Headless CMS ═════════════
       Strapi: { cat: "headless", w: "https://strapi.io", headers: { "x-powered-by": /Strapi/i }, implies: ["Node.js"] },
       Contentful: { cat: "headless", w: "https://www.contentful.com", src: [/(?:images|assets|videos)\.ctfassets\.net/] },
       Sanity: { cat: "headless", w: "https://www.sanity.io", src: [/cdn\.sanity\.io/] },
@@ -182,7 +186,7 @@
       VTEX: { cat: "ecommerce", w: "https://vtex.com", src: [/vteximg\.com\.br|vtexassets\.com/], headers: { "x-vtex-cache-status": "" } },
       WiziShop: { cat: "ecommerce", w: "https://www.wizishop.fr", src: [/wizicdn\.com|wizishop/] },
 
-      // ═════════════ Générateurs statiques ═════════════
+      // ═════════════ Static site generators ═════════════
       Hugo: { cat: "ssg", w: "https://gohugo.io", meta: { generator: /Hugo ?([\d.]+)?/i }, implies: ["Go"] },
       Jekyll: { cat: "ssg", w: "https://jekyllrb.com", meta: { generator: /Jekyll ?v?([\d.]+)?/i }, implies: ["Ruby"] },
       Gatsby: { cat: "ssg", w: "https://www.gatsbyjs.com", meta: { generator: /Gatsby ?([\d.]+)?/i }, dom: ["#___gatsby"], implies: ["React"] },
@@ -201,8 +205,8 @@
       Mintlify: { cat: "ssg", w: "https://mintlify.com", src: [/mintlify/] },
       Nextra: { cat: "ssg", w: "https://nextra.site", dom: [".nextra-nav-container", ".nextra-content"], implies: ["Next.js"] },
 
-      // ═════════════ Plugins / thèmes WordPress ═════════════
-      // (les autres plugins et thèmes sont détectés génériquement via /wp-content/)
+      // ═════════════ WordPress plugins / themes ═════════════
+      // (other plugins and themes are detected generically via /wp-content/)
       Elementor: { cat: "wpplugin", w: "https://elementor.com", meta: { generator: /Elementor ?([\d.]+)?/i }, js: { "elementorFrontendConfig.version": /([\d.]+)/ }, implies: ["WordPress"] },
       "Elementor Pro": { cat: "wpplugin", w: "https://elementor.com/pro/", js: { "ElementorProFrontendConfig.version": /([\d.]+)/ }, implies: ["Elementor"] },
       Divi: { cat: "wptheme", w: "https://www.elegantthemes.com/gallery/divi/", meta: { generator: /Divi ?v?([\d.]+)?/i }, js: { DIVI: null }, implies: ["WordPress"] },
@@ -221,7 +225,7 @@
       MonsterInsights: { cat: "wpplugin", w: "https://www.monsterinsights.com", html: [/<!-- This site uses the Google Analytics by MonsterInsights plugin v([\d.]+)/i], implies: ["WordPress"] },
       Gutenberg: { cat: "wpplugin", w: "https://wordpress.org/gutenberg/", dom: [W("[class*='wp-block-']", 75)], implies: ["WordPress"] },
 
-      // ═════════════ Frameworks JS ═════════════
+      // ═════════════ JS frameworks ═════════════
       React: { cat: "jsfw", w: "https://react.dev", npm: ["react", "react-dom"], js: { "React.version": /([\d.]+)/, "@react": null }, dom: ["[data-reactroot]", "[data-reactid]"] },
       "Next.js": {
         cat: "jsfw", w: "https://nextjs.org", npm: ["next"],
@@ -264,7 +268,7 @@
       Cordova: { cat: "mobile", w: "https://cordova.apache.org", js: { cordova: null } },
       Framework7: { cat: "mobile", w: "https://framework7.io", npm: ["framework7"], js: { Framework7: null } },
 
-      // ═════════════ Bibliothèques JS ═════════════
+      // ═════════════ JS libraries ═════════════
       jQuery: { cat: "jslib", w: "https://jquery.com", npm: ["jquery"], js: { "jQuery.fn.jquery": /([\d.]+)/, "$.fn.jquery": /([\d.]+)/ }, src: [/jquery[.-]([\d.]+\d)(?:\.slim)?(?:\.min)?\.js/i, /\/jquery(?:\.slim)?(?:\.min)?\.js/i] },
       "jQuery UI": { cat: "jslib", w: "https://jqueryui.com", npm: ["jqueryui", "jquery-ui", "jquery-ui-dist"], js: { "jQuery.ui.version": /([\d.]+)/ }, src: [/code\.jquery\.com\/ui\/([\d.]+)\//, /jquery-ui[.-]?([\d.]+\d)?(?:\.min)?\.js/i], implies: ["jQuery"] },
       "jQuery Migrate": { cat: "jslib", w: "https://github.com/jquery/jquery-migrate", npm: ["jquery-migrate"], js: { "jQuery.migrateVersion": /([\d.]+)/ }, implies: ["jQuery"] },
@@ -371,7 +375,7 @@
       Firebase: { cat: "paas", w: "https://firebase.google.com", npm: ["firebase"], js: { "firebase.SDK_VERSION": /([\d.]+)/, firebase: null }, src: [/\/__\/firebase\/([\d.]+)\//, /gstatic\.com\/firebasejs\/([\d.]+)/] },
       Supabase: { cat: "paas", w: "https://supabase.com", npm: ["@supabase/supabase-js"], js: { supabase: W(null) }, src: [/\.supabase\.co\//] },
 
-      // ═════════════ Éditeurs ═════════════
+      // ═════════════ Editors ═════════════
       TinyMCE: { cat: "editor", w: "https://www.tiny.cloud", npm: ["tinymce"], js: { "tinymce.majorVersion": /(\d+)/ }, src: [/cdn\.tiny\.cloud/] },
       CKEditor: { cat: "editor", w: "https://ckeditor.com", npm: ["ckeditor", "ckeditor5"], js: { "CKEDITOR.version": /([\d.]+)/, CKEDITOR_VERSION: /([\d.]+)/ } },
       Quill: { cat: "editor", w: "https://quilljs.com", npm: ["quill"], js: { "Quill.version": /([\d.]+)/ } },
@@ -421,7 +425,7 @@
       Feather: { cat: "fonts", w: "https://feathericons.com", npm: ["feather-icons"], js: { feather: null } },
       Lucide: { cat: "fonts", w: "https://lucide.dev", npm: ["lucide"], dom: ["svg.lucide"] },
 
-      // ═════════════ Frameworks web / langages ═════════════
+      // ═════════════ Web frameworks / languages ═════════════
       Laravel: { cat: "webfw", w: "https://laravel.com", cookies: { laravel_session: "", "XSRF-TOKEN": W("", 25) }, implies: ["PHP"] },
       Symfony: { cat: "webfw", w: "https://symfony.com", headers: { "x-debug-token": "", "x-debug-token-link": "" }, cookies: { sf_redirect: "" }, html: [/sf-toolbar/], implies: ["PHP"] },
       CodeIgniter: { cat: "webfw", w: "https://codeigniter.com", cookies: { ci_session: "" }, implies: ["PHP"] },
@@ -444,7 +448,25 @@
       "Play Framework": { cat: "webfw", w: "https://www.playframework.com", cookies: { PLAY_SESSION: "" }, implies: ["Java"] },
       JSF: { cat: "webfw", w: "https://jakarta.ee/specifications/faces/", html: [/javax\.faces\.ViewState|jakarta\.faces\.ViewState/], implies: ["Java"] },
       ColdFusion: { cat: "webfw", w: "https://www.adobe.com/products/coldfusion-family.html", cookies: { CFID: "", CFTOKEN: "" } },
-      PHP: { cat: "lang", w: "https://www.php.net", headers: { "x-powered-by": /PHP\/?([\d.]+)?/i, server: /PHP\/([\d.]+)/i }, cookies: { PHPSESSID: "" } },
+      PHP: {
+        cat: "lang", w: "https://www.php.net",
+        /* Version is refined further by detector.enrichPhpVersion() across all headers / HTML. */
+        headers: {
+          "x-powered-by": /\bPHP[\/ ]+v?(\d+\.\d+(?:\.\d+)?)/i,
+          server: /\bPHP[\/ ]+v?(\d+\.\d+(?:\.\d+)?)/i,
+          "x-php-version": /(\d+\.\d+(?:\.\d+)?)/,
+          "x-powered-php": /(\d+\.\d+(?:\.\d+)?)/,
+          "php-version": /(\d+\.\d+(?:\.\d+)?)/,
+          "x-cf-powered-by": /\bPHP[\/ ]+v?(\d+\.\d+(?:\.\d+)?)/i,
+        },
+        cookies: { PHPSESSID: "", "PHPSESSID_*": "" },
+        html: [
+          /\bX-Powered-By\s*[:\s]+PHP[\/ ]+v?(\d+\.\d+(?:\.\d+)?)/i,
+          /<!--[^>]{0,80}\bPHP[\/ ]+v?(\d+\.\d+(?:\.\d+)?)[^>]{0,40}-->/i,
+          /\bpowered by PHP[\/ ]+v?(\d+\.\d+(?:\.\d+)?)/i,
+        ],
+        url: /\.php(?:$|\?)/i,
+      },
       Python: { cat: "lang", w: "https://www.python.org", headers: { server: /Python\/?([\d.]+)?/i } },
       Ruby: { cat: "lang", w: "https://www.ruby-lang.org", headers: { server: /(?:Puma|WEBrick|Unicorn)/i } },
       Java: { cat: "lang", w: "https://www.java.com", cookies: { JSESSIONID: W("", 75) }, headers: { "x-powered-by": /(?:Servlet|JSP)/i } },
@@ -467,7 +489,7 @@
       FreeBSD: { cat: "os", w: "https://www.freebsd.org", headers: { server: /FreeBSD/i } },
       "Windows Server": { cat: "os", w: "https://www.microsoft.com/windows-server", headers: { server: /\(Win(?:32|64)\)/i } },
 
-      // ═════════════ Serveurs web ═════════════
+      // ═════════════ Web servers ═════════════
       Nginx: { cat: "server", w: "https://nginx.org", headers: { server: /nginx(?:\/([\d.]+))?/i, "x-nginx-cache": "" } },
       Apache: { cat: "server", w: "https://httpd.apache.org", headers: { server: /Apache(?:\/([\d.]+))?(?!-Coyote)/i } },
       "Apache Tomcat": { cat: "server", w: "https://tomcat.apache.org", headers: { server: /Apache-Coyote(?:\/([\d.]+))?/i }, implies: ["Java"] },
@@ -523,7 +545,7 @@
       "Google Hosted Libraries": { cat: "cdn", w: "https://developers.google.com/speed/libraries", src: [/ajax\.googleapis\.com\/ajax\/libs/] },
       BootstrapCDN: { cat: "cdn", w: "https://www.bootstrapcdn.com", src: [/(?:stackpath|maxcdn|netdna)\.bootstrapcdn\.com/] },
 
-      // ═════════════ Hébergement / PaaS ═════════════
+      // ═════════════ Hosting / PaaS ═════════════
       Vercel: { cat: "paas", w: "https://vercel.com", headers: { server: /Vercel/i, "x-vercel-id": "", "x-vercel-cache": "" }, url: /\.vercel\.app\b/ },
       Netlify: { cat: "paas", w: "https://www.netlify.com", headers: { server: /Netlify/i, "x-nf-request-id": "" }, url: /\.netlify\.app\b/ },
       "GitHub Pages": { cat: "paas", w: "https://pages.github.com", headers: { server: /GitHub\.com/i, "x-github-request-id": "" }, url: /\.github\.io\b/ },
@@ -553,7 +575,7 @@
       cPanel: { cat: "panel", w: "https://cpanel.net", headers: { server: /cpsrvd/i } },
       DirectAdmin: { cat: "panel", w: "https://www.directadmin.com", headers: { server: /DirectAdmin/i } },
 
-      // ═════════════ Sécurité / WAF ═════════════
+      // ═════════════ Security / WAF ═════════════
       reCAPTCHA: { cat: "security", w: "https://www.google.com/recaptcha/", js: { grecaptcha: null }, src: [/google\.com\/recaptcha|recaptcha\.net|gstatic\.com\/recaptcha/] },
       hCaptcha: { cat: "security", w: "https://www.hcaptcha.com", js: { hcaptcha: null }, src: [/hcaptcha\.com/] },
       "Cloudflare Turnstile": { cat: "security", w: "https://www.cloudflare.com/products/turnstile/", js: { turnstile: null }, src: [/challenges\.cloudflare\.com\/turnstile/] },
@@ -636,7 +658,7 @@
       VWO: { cat: "abtest", w: "https://vwo.com", js: { _vwo_code: null, VWO: null } },
       "Google Optimize": { cat: "abtest", w: "https://optimize.google.com", src: [/googleoptimize\.com/] },
 
-      // ═════════════ Publicité / pixels ═════════════
+      // ═════════════ Ads / pixels ═════════════
       "Meta Pixel": { cat: "ads", w: "https://www.facebook.com/business/tools/meta-pixel", js: { fbq: null }, src: [/connect\.facebook\.net\/[^/]+\/fbevents\.js/] },
       "Google AdSense": { cat: "ads", w: "https://adsense.google.com", js: { adsbygoogle: null }, src: [/pagead2\.googlesyndication\.com/] },
       "Google Ads": { cat: "ads", w: "https://ads.google.com", src: [/googleadservices\.com/, /googleads\.g\.doubleclick\.net/, /googletagmanager\.com\/gtag\/js\?id=AW-/] },
@@ -686,7 +708,7 @@
       "Help Scout": { cat: "chat", w: "https://www.helpscout.com", js: { Beacon: W(null, 75) }, src: [/beacon-v2\.helpscout\.net/] },
       Botpress: { cat: "chat", w: "https://botpress.com", js: { botpressWebChat: null, botpress: W(null) } },
 
-      // ═════════════ Consentement ═════════════
+      // ═════════════ Cookie consent ═════════════
       Axeptio: { cat: "consent", w: "https://www.axeptio.eu", js: { axeptioSettings: null, _axcb: null }, src: [/static\.axept\.io/] },
       Didomi: { cat: "consent", w: "https://www.didomi.io", js: { Didomi: null, didomiConfig: null }, src: [/sdk\.privacy-center\.org/] },
       OneTrust: { cat: "consent", w: "https://www.onetrust.com", js: { OneTrust: null, OptanonWrapper: null }, src: [/cdn\.cookielaw\.org|optanon/] },
@@ -701,7 +723,7 @@
       CookieConsent: { cat: "consent", w: "https://cookieconsent.orestbida.com", npm: ["vanilla-cookieconsent", "cookieconsent"], js: { CookieConsent: null, cookieconsent: null } },
       Termly: { cat: "consent", w: "https://termly.io", src: [/app\.termly\.io/] },
 
-      // ═════════════ Paiement ═════════════
+      // ═════════════ Payment ═════════════
       Stripe: { cat: "payment", w: "https://stripe.com", js: { Stripe: null, "Stripe.version": /(\d+)/ }, src: [/js\.stripe\.com\/v(\d)/] },
       PayPal: { cat: "payment", w: "https://www.paypal.com", js: { paypal: null }, src: [/paypal\.com\/sdk|paypalobjects\.com/] },
       Adyen: { cat: "payment", w: "https://www.adyen.com", js: { AdyenCheckout: null }, src: [/checkoutshopper-live\.adyen\.com\/checkoutshopper\/sdk\/([\d.]+)\//] },
@@ -731,12 +753,12 @@
       "Akamai mPulse": { cat: "monitoring", w: "https://www.akamai.com/products/mpulse-real-user-monitoring", js: { BOOMR: null, "BOOMR.version": /([\d.]+)/ } },
       SpeedCurve: { cat: "monitoring", w: "https://www.speedcurve.com", js: { LUX: null } },
 
-      // ═════════════ Recherche ═════════════
+      // ═════════════ Search ═════════════
       Algolia: { cat: "search", w: "https://www.algolia.com", npm: ["algoliasearch", "instantsearch.js", "@docsearch/js"], js: { algoliasearch: null, docsearch: null, "instantsearch.version": /([\d.]+)/ }, src: [/algolia(?:net|search)?\.(?:com|net)/] },
       Meilisearch: { cat: "search", w: "https://www.meilisearch.com", js: { MeiliSearch: null } },
       Doofinder: { cat: "search", w: "https://www.doofinder.com", js: { doofinder: null }, src: [/doofinder\.com/] },
 
-      // ═════════════ Vidéo / cartes ═════════════
+      // ═════════════ Video / maps ═════════════
       YouTube: { cat: "media", w: "https://www.youtube.com", html: [/youtube(?:-nocookie)?\.com\/embed\//], js: { YT: W(null) }, src: [/youtube\.com\/iframe_api/] },
       Vimeo: { cat: "media", w: "https://vimeo.com", html: [/player\.vimeo\.com/], js: { Vimeo: null } },
       Wistia: { cat: "media", w: "https://wistia.com", js: { Wistia: null } },

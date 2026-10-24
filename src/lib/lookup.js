@@ -1,4 +1,4 @@
-/* Requêtes réseau : DNS (DoH), géolocalisation / ASN, RDAP (whois moderne). */
+/* Network lookups: DNS (DoH), geolocation / ASN, RDAP (modern whois). */
 (() => {
   const TTL = 15 * 60 * 1000;
   const cache = new Map();
@@ -111,7 +111,7 @@
     return r.map((x) => x.data.replace(/\.$/, ""));
   }
 
-  // ───────────── Géolocalisation / ASN ─────────────
+  // ───────────── Geolocation / ASN ─────────────
   async function geo(ip) {
     try {
       const j = await fetchJSON(`https://ipwho.is/${encodeURIComponent(ip)}`, { timeout: 7000 });
@@ -284,7 +284,7 @@
               res.abusePhone = res.abusePhone || r2.abusePhone;
               if (!res.registrar && r2.registrar) res.registrar = r2.registrar;
             } catch (e) {
-              /* le RDAP du registrar est optionnel */
+              /* registrar RDAP is optional */
             }
           }
           return res;

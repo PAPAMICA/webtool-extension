@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="popup.css" />
@@ -12,7 +12,7 @@
           <div id="host" class="host">…</div>
           <div id="url" class="url"></div>
         </div>
-        <button id="refresh" class="icon-btn" title="Relancer l'analyse">
+        <button id="refresh" class="icon-btn" title="Rescan page">
           <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
         </button>
       </div>
@@ -20,12 +20,12 @@
     </header>
 
     <nav id="tabs" class="tabs">
-      <button data-tab="overview" class="active">Aperçu</button>
-      <button data-tab="tech">Technos <span class="count" id="count-tech"></span></button>
+      <button data-tab="overview" class="active">Overview</button>
+      <button data-tab="tech">Tech <span class="count" id="count-tech"></span></button>
       <button data-tab="ip">IP / ASN</button>
-      <button data-tab="domain">Domaine</button>
-      <button data-tab="cert">Certificat</button>
-      <button data-tab="headers">En-têtes</button>
+      <button data-tab="domain">Domain</button>
+      <button data-tab="cert">Certificate</button>
+      <button data-tab="headers">Headers</button>
     </nav>
 
     <main id="main">

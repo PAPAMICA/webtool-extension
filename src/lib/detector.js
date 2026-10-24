@@ -1,5 +1,5 @@
 (() => {
-  const PRIO = { js: 4, meta: 4, "en-tête": 4, cdn: 3, fichier: 3, html: 2, script: 2, cookie: 1, url: 1, "?ver": 1, certificat: 1 };
+  const PRIO = { js: 4, meta: 4, header: 4, cdn: 3, file: 3, html: 2, script: 2, cookie: 1, url: 1, "?ver": 1, certificate: 1 };
 
   const CDN_RES = [
     /cdnjs\.cloudflare\.com\/ajax\/libs\/([^/]+)\/([^/]+)\//,
@@ -111,7 +111,7 @@
       if (t.headers) {
         for (const [h, p] of Object.entries(t.headers)) {
           const r = test(p, headers[h]);
-          if (r) add(name, r.version, "en-tête", r.c, undefined, r.raw);
+          if (r) add(name, r.version, "header", r.c, undefined, r.raw);
         }
       }
       if (t.cookies) {
@@ -167,7 +167,7 @@
       }
       if (t.certIssuer && s.certIssuer) {
         const r = test(t.certIssuer, s.certIssuer);
-        if (r) add(name, null, "certificat", r.c);
+        if (r) add(name, null, "certificate", r.c);
       }
     }
 
@@ -185,7 +185,7 @@
       if (!hit) {
         const m = FILE_RE.exec(u);
         const name = m && idx.pkg.get(m[1].toLowerCase());
-        if (name) { add(name, m[2], "fichier"); hit = true; }
+        if (name) { add(name, m[2], "file"); hit = true; }
       }
       if (!hit) {
         const m = QUERY_RE.exec(u);
@@ -237,7 +237,7 @@
         if ((idx.headerPatterns[h] || []).some((p) => test(p, tok))) continue;
         const m = /^(.+?)(?:[\/ ]v?(\d[\w.-]*))?$/.exec(tok.trim());
         if (!m || /^\d/.test(m[1]) || known(m[1])) continue;
-        add(m[1], m[2], "en-tête", 100, { cat, generic: true });
+        add(m[1], m[2], "header", 100, { cat, generic: true });
       }
     }
     for (const v of meta.generator || []) {
@@ -257,12 +257,12 @@
         if (existing) {
           if (existing.confidence < parent.confidence) {
             existing.confidence = parent.confidence;
-            if (!existing.via.includes("déduit")) existing.via.push("déduit");
+            if (!existing.via.includes("implied")) existing.via.push("implied");
             queue.push(imp);
           }
           continue;
         }
-        found.set(imp, { name: imp, version: null, via: ["déduit"], confidence: parent.confidence, implied: true, impliedBy: n });
+        found.set(imp, { name: imp, version: null, via: ["implied"], confidence: parent.confidence, implied: true, impliedBy: n });
         queue.push(imp);
       }
     }

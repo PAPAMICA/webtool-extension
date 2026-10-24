@@ -2,7 +2,7 @@
   "manifest_version": 2,
   "name": "WebTool Inspector",
   "version": "1.0.0",
-  "description": "Technologies, IP, ASN, WHOIS/RDAP, DNS, certificat TLS et en-têtes HTTP du site courant en un coup d'œil.",
+  "description": "Technologies, IP, ASN, WHOIS/RDAP, DNS, TLS certificate and HTTP headers for the current site \u2014 at a glance.",
   "icons": {
     "48": "icons/icon.svg",
     "96": "icons/icon.svg"
@@ -32,8 +32,14 @@
   },
   "content_scripts": [
     {
-      "matches": ["http://*/*", "https://*/*"],
-      "js": ["src/lib/technologies.js", "src/content/collect.js"],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "src/lib/technologies.js",
+        "src/content/collect.js"
+      ],
       "run_at": "document_idle"
     }
   ],

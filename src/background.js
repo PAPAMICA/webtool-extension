@@ -175,7 +175,7 @@ async function rescan(tabId) {
     await browser.tabs.executeScript(tabId, { file: "/src/content/collect.js" });
   } catch (e) {
     pendingScans.delete(tabId);
-    throw new Error("Impossible d'analyser cette page : " + e.message);
+    throw new Error("Unable to analyze this page: " + e.message);
   }
   await wait;
   return publicRecord(tabId);

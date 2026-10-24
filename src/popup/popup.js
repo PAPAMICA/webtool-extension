@@ -12,15 +12,15 @@ const state = {
 };
 
 const SECURITY_HEADERS = [
-  { h: "strict-transport-security", label: "Strict-Transport-Security", desc: "Force l'usage de HTTPS (HSTS)", core: true },
-  { h: "content-security-policy", label: "Content-Security-Policy", desc: "Restreint les sources de contenu (XSS, injection)", core: true },
-  { h: "x-frame-options", label: "X-Frame-Options", desc: "Protège contre le clickjacking", core: true, alt: (hs) => /frame-ancestors/i.test(hs["content-security-policy"] || "") && "via CSP frame-ancestors" },
-  { h: "x-content-type-options", label: "X-Content-Type-Options", desc: "Désactive le MIME sniffing", core: true, good: /nosniff/i },
-  { h: "referrer-policy", label: "Referrer-Policy", desc: "Contrôle les informations du Referer", core: true },
-  { h: "permissions-policy", label: "Permissions-Policy", desc: "Restreint les API navigateur (caméra, géoloc…)", core: true },
-  { h: "cross-origin-opener-policy", label: "Cross-Origin-Opener-Policy", desc: "Isolation du contexte de navigation" },
-  { h: "cross-origin-embedder-policy", label: "Cross-Origin-Embedder-Policy", desc: "Isolation cross-origin des ressources" },
-  { h: "cross-origin-resource-policy", label: "Cross-Origin-Resource-Policy", desc: "Limite le chargement cross-origin" },
+  { h: "strict-transport-security", label: "Strict-Transport-Security", desc: "Enforces HTTPS (HSTS)", core: true },
+  { h: "content-security-policy", label: "Content-Security-Policy", desc: "Restricts content sources (XSS, injection)", core: true },
+  { h: "x-frame-options", label: "X-Frame-Options", desc: "Protects against clickjacking", core: true, alt: (hs) => /frame-ancestors/i.test(hs["content-security-policy"] || "") && "via CSP frame-ancestors" },
+  { h: "x-content-type-options", label: "X-Content-Type-Options", desc: "Disables MIME sniffing", core: true, good: /nosniff/i },
+  { h: "referrer-policy", label: "Referrer-Policy", desc: "Controls Referer information", core: true },
+  { h: "permissions-policy", label: "Permissions-Policy", desc: "Restricts browser APIs (camera, geolocation…)", core: true },
+  { h: "cross-origin-opener-policy", label: "Cross-Origin-Opener-Policy", desc: "Isolates the browsing context" },
+  { h: "cross-origin-embedder-policy", label: "Cross-Origin-Embedder-Policy", desc: "Cross-origin resource isolation" },
+  { h: "cross-origin-resource-policy", label: "Cross-Origin-Resource-Policy", desc: "Limits cross-origin loading" },
 ];
 const LEAK_HEADERS = ["server", "x-powered-by", "x-aspnet-version", "x-aspnetmvc-version", "x-generator", "x-drupal-cache", "x-runtime", "via"];
 
@@ -52,16 +52,16 @@ function toast(msg) {
 async function copy(text) {
   try {
     await navigator.clipboard.writeText(text);
-    toast(`Copié : ${text.length > 60 ? text.slice(0, 60) + "…" : text}`);
+    toast(`Copied: ${text.length > 60 ? text.slice(0, 60) + "…" : text}`);
   } catch (e) {
-    toast("Impossible de copier");
+    toast("Unable to copy");
   }
 }
 
 const cp = (text, display, cls = "") =>
   text == null || text === ""
     ? h("span", { class: "faint" }, "—")
-    : h("span", { class: `copy ${cls}`, title: "Cliquer pour copier", onclick: () => copy(String(text)) }, display ?? String(text));
+    : h("span", { class: `copy ${cls}`, title: "Click to copy", onclick: () => copy(String(text)) }, display ?? String(text));
 
 function ext(href, label, cls) {
   return h("a", {
@@ -90,7 +90,7 @@ function kv(label, value, { mono, copyable = true, raw } = {}) {
   return h("div", { class: "kv" }, h("div", { class: "k" }, label), h("div", { class: "v" }, v));
 }
 
-const loading = (msg = "Chargement…") => h("div", { class: "loading" }, h("span", { class: "spinner" }), msg);
+const loading = (msg = "Loading…") => h("div", { class: "loading" }, h("span", { class: "spinner" }), msg);
 const errorLine = (msg) => h("div", { class: "notice bad" }, msg);
 const pill = (text, kind = "", title) => h("span", { class: `pill ${kind}`, title }, h("span", { class: "dot" }), text);
 
@@ -101,12 +101,12 @@ function fmtDate(d) {
   if (!d) return null;
   const date = new Date(d);
   if (isNaN(date)) return String(d);
-  return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+  return date.toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function fmtDateTime(d) {
   if (!d) return null;
-  return new Date(d).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" });
+  return new Date(d).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
 }
 
 function relative(d) {
@@ -115,12 +115,12 @@ function relative(d) {
   const abs = Math.abs(diff);
   const days = Math.round(abs / DAY);
   let s;
-  if (days < 1) s = "aujourd'hui";
-  else if (days < 60) s = `${days} j`;
-  else if (days < 730) s = `${Math.round(days / 30.4)} mois`;
-  else s = `${(days / 365.25).toFixed(1).replace(".0", "")} ans`;
+  if (days < 1) s = "today";
+  else if (days < 60) s = `${days}d`;
+  else if (days < 730) s = `${Math.round(days / 30.4)} mo`;
+  else s = `${(days / 365.25).toFixed(1).replace(".0", "")}y`;
   if (days < 1) return s;
-  return diff > 0 ? `dans ${s}` : `il y a ${s}`;
+  return diff > 0 ? `in ${s}` : `${s} ago`;
 }
 
 const daysLeft = (d) => Math.floor((new Date(d).getTime() - Date.now()) / DAY);
@@ -175,16 +175,16 @@ function renderHero() {
   const sec = r?.security;
   if (sec) {
     if (sec.state === "secure") pills.push(pill(sec.protocolVersion || "TLS", "ok", sec.cipherSuite));
-    else if (sec.state === "insecure") pills.push(pill("HTTP non chiffré", "bad"));
+    else if (sec.state === "insecure") pills.push(pill("Unencrypted HTTP", "bad"));
     else pills.push(pill(`TLS ${sec.state}`, "warn", sec.errorMessage));
   } else if (state.url?.startsWith("http:")) {
-    pills.push(pill("HTTP non chiffré", "bad"));
+    pills.push(pill("Unencrypted HTTP", "bad"));
   }
   const leaf = sec?.certificates?.[0];
   if (leaf?.validity?.end) {
     const left = daysLeft(leaf.validity.end);
     const kind = left < 15 ? "bad" : left < 30 ? "warn" : "ok";
-    pills.push(pill(left < 0 ? `Cert. expiré depuis ${-left} j` : `Cert. expire dans ${left} j`, kind, `Expiration le ${fmtDate(leaf.validity.end)}`));
+    pills.push(pill(left < 0 ? `Cert. expired ${-left}d ago` : `Cert. expires in ${left}d`, kind, `Expires on ${fmtDate(leaf.validity.end)}`));
   }
   if (state.selectedIp) {
     const g = currentGeo();
@@ -192,9 +192,9 @@ function renderHero() {
     const ptr = state.ips[state.selectedIp]?.ptr;
     if (Array.isArray(ptr) && ptr.length) pills.push(pill(ptr[0], "info", "Reverse DNS (PTR)"));
     const org = g?.org || g?.isp;
-    if (org) pills.push(pill(org, "", g.isp && g.isp !== org ? `FAI : ${g.isp}` : "Organisation"));
+    if (org) pills.push(pill(org, "", g.isp && g.isp !== org ? `ISP: ${g.isp}` : "Organization"));
   }
-  if (r?.redirects?.length) pills.push(pill(`${r.redirects.length} redirection${r.redirects.length > 1 ? "s" : ""}`, "warn"));
+  if (r?.redirects?.length) pills.push(pill(`${r.redirects.length} redirect${r.redirects.length > 1 ? "s" : ""}`, "warn"));
   document.getElementById("pills").replaceChildren(...pills);
   document.getElementById("count-tech").textContent = state.techs?.length || "";
 }
@@ -209,56 +209,56 @@ function renderOverview() {
   const leaf = sec?.certificates?.[0];
   const hs = headersObj(state.record?.responseHeaders);
 
-  const hosting = card("Hébergement", [
+  const hosting = card("Hosting", [
     state.selectedIp
       ? h("div", { class: "ip-row" },
           h("div", { class: "big" }, cp(state.selectedIp, null, "mono")),
           g ? h("div", { class: "ip-loc" }, `${flag(g.countryCode)} ${[g.city, g.region, g.country].filter(Boolean).join(", ")}`) : null)
-      : loading("Résolution DNS…"),
+      : loading("Resolving DNS…"),
     ipInfo?.loading ? loading() : null,
     g ? kv("AS", g.asn ? `AS${g.asn}` : null, { mono: true }) : null,
-    g ? kv("Organisation", g.org || g.isp) : null,
-    g && g.isp && g.isp !== g.org ? kv("FAI", g.isp) : null,
+    g ? kv("Organization", g.org || g.isp) : null,
+    g && g.isp && g.isp !== g.org ? kv("ISP", g.isp) : null,
     ipInfo?.ptr && !ipInfo.ptr.error ? kv("Reverse DNS", ipInfo.ptr[0] || null, { mono: true }) : null,
   ], { ico: "🌍" });
 
   let domainBody;
-  if (isIP(state.host)) domainBody = h("div", { class: "muted" }, "Accès direct par IP");
-  else if (!dom) domainBody = loading("Requête RDAP…");
+  if (isIP(state.host)) domainBody = h("div", { class: "muted" }, "Direct IP access");
+  else if (!dom) domainBody = loading("RDAP lookup…");
   else if (dom.error) domainBody = [h("div", { class: "muted small" }, dom.error), whoisFallbackLink()];
   else {
     const d = dom.data;
     const left = d.expires ? daysLeft(d.expires) : null;
     domainBody = [
-      h("div", { class: "stat" }, h("div", { class: "big" }, cp(d.domain)), h("div", { class: "muted small" }, d.registrar?.name || "Registrar inconnu")),
-      kv("Création", d.created ? `${fmtDate(d.created)} (${relative(d.created)})` : null, { copyable: false }),
-      kv("Expiration", d.expires ? h("span", { class: left < 30 ? "bad" : left < 90 ? "warn" : "" }, `${fmtDate(d.expires)} (${relative(d.expires)})`) : null, { raw: !!d.expires }),
-      kv("DNSSEC", d.dnssec == null ? null : d.dnssec ? h("span", { class: "ok" }, "Activé") : h("span", { class: "muted" }, "Non signé"), { raw: d.dnssec != null }),
+      h("div", { class: "stat" }, h("div", { class: "big" }, cp(d.domain)), h("div", { class: "muted small" }, d.registrar?.name || "Unknown registrar")),
+      kv("Created", d.created ? `${fmtDate(d.created)} (${relative(d.created)})` : null, { copyable: false }),
+      kv("Expires", d.expires ? h("span", { class: left < 30 ? "bad" : left < 90 ? "warn" : "" }, `${fmtDate(d.expires)} (${relative(d.expires)})`) : null, { raw: !!d.expires }),
+      kv("DNSSEC", d.dnssec == null ? null : d.dnssec ? h("span", { class: "ok" }, "Enabled") : h("span", { class: "muted" }, "Unsigned"), { raw: d.dnssec != null }),
     ];
   }
-  const domainCard = card("Domaine", domainBody, { ico: "🏷️" });
+  const domainCard = card("Domain", domainBody, { ico: "🏷️" });
 
   let certBody;
-  if (!state.record) certBody = h("div", { class: "muted small" }, "Rechargez la page pour capturer le certificat.");
-  else if (sec?.state === "insecure" || state.url.startsWith("http:")) certBody = h("div", { class: "bad" }, "Connexion non chiffrée (HTTP)");
-  else if (!leaf) certBody = h("div", { class: "muted small" }, state.record.securityError || "Certificat non capturé — rechargez la page.");
+  if (!state.record) certBody = h("div", { class: "muted small" }, "Reload the page to capture the certificate.");
+  else if (sec?.state === "insecure" || state.url.startsWith("http:")) certBody = h("div", { class: "bad" }, "Unencrypted connection (HTTP)");
+  else if (!leaf) certBody = h("div", { class: "muted small" }, state.record.securityError || "Certificate not captured — reload the page.");
   else {
     const left = daysLeft(leaf.validity.end);
     const issuer = parseDN(leaf.issuer);
     certBody = [
       h("div", { class: "stat" },
         h("div", { class: "big" }, dnName(leaf.subject)),
-        h("div", { class: "muted small" }, `Émis par ${issuer.O?.[0] || dnName(leaf.issuer)}`)),
-      kv("Expire", h("span", { class: left < 0 ? "bad" : left < 15 ? "bad" : left < 30 ? "warn" : "ok" }, `${fmtDate(leaf.validity.end)} (${left < 0 ? "expiré" : left + " j"})`), { raw: true }),
-      kv("Protocole", [sec.protocolVersion, sec.keaGroupName].filter(Boolean).join(" · "), { copyable: false }),
+        h("div", { class: "muted small" }, `Issued by ${issuer.O?.[0] || dnName(leaf.issuer)}`)),
+      kv("Expires", h("span", { class: left < 0 ? "bad" : left < 15 ? "bad" : left < 30 ? "warn" : "ok" }, `${fmtDate(leaf.validity.end)} (${left < 0 ? "expired" : left + "d"})`), { raw: true }),
+      kv("Protocol", [sec.protocolVersion, sec.keaGroupName].filter(Boolean).join(" · "), { copyable: false }),
       kv("SAN", leaf.parsed?.san?.length ? `${leaf.parsed.san.length} nom${leaf.parsed.san.length > 1 ? "s" : ""}` : null, { copyable: false }),
     ];
   }
-  const certCard = card("Certificat", certBody, { ico: "🔒" });
+  const certCard = card("Certificate", certBody, { ico: "🔒" });
 
   let techBody;
-  if (state.techs == null) techBody = loading("Analyse de la page…");
-  else if (!state.techs.length) techBody = h("div", { class: "muted small" }, "Aucune technologie détectée.");
+  if (state.techs == null) techBody = loading("Analyzing page…");
+  else if (!state.techs.length) techBody = h("div", { class: "muted small" }, "No technologies detected.");
   else {
     const shown = state.techs.filter((t) => !t.implied).slice(0, 18);
     techBody = h("div", { class: "chips" },
@@ -268,7 +268,7 @@ function renderOverview() {
   }
   const techCard = card("Technologies", techBody, {
     ico: "🧩",
-    extra: state.techs?.length ? h("a", { onclick: () => switchTab("tech") }, "Tout voir") : null,
+    extra: state.techs?.length ? h("a", { onclick: () => switchTab("tech") }, "View all") : null,
   });
 
   let secCard = null;
@@ -276,13 +276,13 @@ function renderOverview() {
     const core = SECURITY_HEADERS.filter((s) => s.core);
     const present = core.filter((s) => hs[s.h] || s.alt?.(hs));
     const ratio = present.length / core.length;
-    secCard = card("En-têtes de sécurité", [
+    secCard = card("Security headers", [
       h("div", { class: "score" },
         h("span", { class: `big ${ratio >= 0.8 ? "ok" : ratio >= 0.5 ? "warn" : "bad"}` }, `${present.length}/${core.length}`),
         h("div", { class: "score-bar" }, core.map((s) => h("i", { class: present.includes(s) ? "on" : "", title: s.label })))),
       h("div", { class: "chips", style: "margin-top:8px" },
         core.filter((s) => !present.includes(s)).map((s) => h("span", { class: "chip", title: s.desc }, h("span", { class: "bad" }, "✕"), s.label))),
-    ], { ico: "🛡️", extra: h("a", { onclick: () => switchTab("headers") }, "Détails") });
+    ], { ico: "🛡️", extra: h("a", { onclick: () => switchTab("headers") }, "Details") });
   }
 
   panel.replaceChildren(
@@ -290,8 +290,8 @@ function renderOverview() {
     techCard,
     certCard,
     domainCard,
-    secCard || card("En-têtes de sécurité", h("div", { class: "muted small" }, "Rechargez la page pour analyser les en-têtes."), { ico: "🛡️" }),
-    card("Outils OSINT", quickLinks(), { ico: "🔎" })
+    secCard || card("Security headers", h("div", { class: "muted small" }, "Reload the page to analyze headers."), { ico: "🛡️" }),
+    card("OSINT tools", quickLinks(), { ico: "🔎" })
   );
 }
 
@@ -323,7 +323,7 @@ function quickLinks() {
 }
 
 function whoisFallbackLink() {
-  return h("div", { style: "margin-top:6px" }, ext(`https://who.is/whois/${encodeURIComponent(registrable(state.host))}`, "Voir le WHOIS sur who.is ↗"));
+  return h("div", { style: "margin-top:6px" }, ext(`https://who.is/whois/${encodeURIComponent(registrable(state.host))}`, "View WHOIS on who.is ↗"));
 }
 
 // ───────────── Rendu : technologies ─────────────
@@ -333,15 +333,15 @@ function renderTech() {
     state.techs?.length ? h("button", {
       class: "btn",
       onclick: () => copy(state.techs.map((t) => `${t.name}${t.version ? " " + t.version : ""} — ${t.catLabel}`).join("\n")),
-    }, "Copier la liste") : null,
-    h("button", { class: "btn", onclick: () => doRescan() }, state.scanning ? "Analyse…" : "Relancer"));
+    }, "Copy list") : null,
+    h("button", { class: "btn", onclick: () => doRescan() }, state.scanning ? "Scanning…" : "Rescan"));
 
   if (state.techs == null || (state.scanning && !state.techs?.length)) {
-    panel.replaceChildren(card("Technologies", loading("Analyse de la page…"), { extra: actions }));
+    panel.replaceChildren(card("Technologies", loading("Analyzing page…"), { extra: actions }));
     return;
   }
   if (!state.techs.length) {
-    panel.replaceChildren(card("Technologies", h("div", { class: "empty" }, "Aucune technologie détectée sur cette page."), { extra: actions }));
+    panel.replaceChildren(card("Technologies", h("div", { class: "empty" }, "No technologies detected on this page."), { extra: actions }));
     return;
   }
 
@@ -360,8 +360,8 @@ function renderTech() {
           h("div", null,
             h("div", { class: "tech-name" }, t.website ? ext(t.website, t.name) : t.name),
             h("div", { class: "tech-meta" },
-              t.confidence < 100 ? h("span", { class: "warn" }, `probable (${t.confidence} %) · `) : null,
-              t.implied ? `déduit de ${t.impliedBy}` : `détecté via ${t.via.join(", ")}`)),
+              t.confidence < 100 ? h("span", { class: "warn" }, `likely (${t.confidence}%) · `) : null,
+              t.implied ? `implied by ${t.impliedBy}` : `detected via ${t.via.join(", ")}`)),
           t.version ? h("span", { class: "ver" }, t.version) : null))));
 
   panel.replaceChildren(card(`${state.techs.length} technologies`, body, { flush: true, extra: actions }));
@@ -377,14 +377,14 @@ function renderIp() {
   const ipChips = ips.length
     ? h("div", { class: "chips" }, ips.map((x) =>
         h("span", { class: `chip click mono ${x.ip === state.selectedIp ? "sel" : ""}`, title: x.src, onclick: () => selectIp(x.ip) },
-          x.ip, x.connected ? h("span", { class: "ver" }, "connectée") : null)))
-    : d ? h("div", { class: "muted" }, "Aucune adresse résolue") : loading("Résolution DNS…");
+          x.ip, x.connected ? h("span", { class: "ver" }, "connected") : null)))
+    : d ? h("div", { class: "muted" }, "No addresses resolved") : loading("Resolving DNS…");
 
-  out.push(card("Adresses IP", [
+  out.push(card("IP addresses", [
     ipChips,
-    state.record?.ip ? h("div", { class: "small muted", style: "margin-top:6px" }, `IP réellement contactée par Firefox : ${state.record.ip}`) : null,
-    d?.cname && !d.cname.error && d.cname.length ? kv("Chaîne CNAME", d.cname.join(" → "), { mono: true }) : null,
-    d?.system?.isTRR != null ? kv("Résolveur", d.system.isTRR ? "DNS over HTTPS (TRR Firefox)" : "Résolveur système", { copyable: false }) : null,
+    state.record?.ip ? h("div", { class: "small muted", style: "margin-top:6px" }, `IP actually contacted by Firefox: ${state.record.ip}`) : null,
+    d?.cname && !d.cname.error && d.cname.length ? kv("CNAME chain", d.cname.join(" → "), { mono: true }) : null,
+    d?.system?.isTRR != null ? kv("Resolver", d.system.isTRR ? "DNS over HTTPS (Firefox TRR)" : "System resolver", { copyable: false }) : null,
   ], { ico: "📍" }));
 
   const info = state.ips[state.selectedIp];
@@ -393,41 +393,41 @@ function renderIp() {
     return;
   }
   if (!info || info.loading) {
-    out.push(card(state.selectedIp, loading("Géolocalisation, ASN, RDAP…")));
+    out.push(card(state.selectedIp, loading("Geolocation, ASN, RDAP…")));
     panel.replaceChildren(...out);
     return;
   }
 
   const g = info.geo;
-  out.push(card("Localisation & opérateur", g.error ? errorLine(`Géolocalisation indisponible : ${g.error}`) : [
+  out.push(card("Location & operator", g.error ? errorLine(`Geolocation unavailable: ${g.error}`) : [
     kv("IP", g.ip, { mono: true }),
-    kv("Pays", g.country ? `${flag(g.countryCode)} ${g.country} (${g.countryCode})` : null),
-    kv("Région / ville", [g.region, g.city, g.postal].filter(Boolean).join(", ") || null),
-    kv("Coordonnées", g.lat != null && !isNaN(g.lat) ? ext(`https://www.openstreetmap.org/?mlat=${g.lat}&mlon=${g.lon}#map=10/${g.lat}/${g.lon}`, `${g.lat}, ${g.lon} ↗`) : null, { raw: g.lat != null && !isNaN(g.lat) }),
-    kv("Fuseau horaire", g.timezone),
+    kv("Country", g.country ? `${flag(g.countryCode)} ${g.country} (${g.countryCode})` : null),
+    kv("Region / city", [g.region, g.city, g.postal].filter(Boolean).join(", ") || null),
+    kv("Coordinates", g.lat != null && !isNaN(g.lat) ? ext(`https://www.openstreetmap.org/?mlat=${g.lat}&mlon=${g.lon}#map=10/${g.lat}/${g.lon}`, `${g.lat}, ${g.lon} ↗`) : null, { raw: g.lat != null && !isNaN(g.lat) }),
+    kv("Timezone", g.timezone),
     kv("ASN", g.asn ? h("span", null, cp(`AS${g.asn}`, null, "mono"), " ", ext(`https://bgp.he.net/AS${g.asn}`, "↗")) : null, { raw: !!g.asn }),
-    kv("Nom AS / Org", g.org),
-    kv("FAI (ISP)", g.isp),
-    g.asDomain ? kv("Domaine opérateur", g.asDomain, { mono: true }) : null,
-    h("div", { class: "faint small", style: "margin-top:4px;text-align:right" }, `source : ${g.source}`),
+    kv("AS name / Org", g.org),
+    kv("ISP", g.isp),
+    g.asDomain ? kv("Operator domain", g.asDomain, { mono: true }) : null,
+    h("div", { class: "faint small", style: "margin-top:4px;text-align:right" }, `source: ${g.source}`),
   ], { ico: "🌍" }));
 
   out.push(card("Reverse DNS (PTR)", info.ptr.error ? errorLine(info.ptr.error)
     : info.ptr.length ? info.ptr.map((p) => kv("PTR", p, { mono: true }))
-    : h("div", { class: "muted" }, "Aucun enregistrement PTR"), { ico: "↩️" }));
+    : h("div", { class: "muted" }, "No PTR record"), { ico: "↩️" }));
 
   const r = info.rdap;
-  out.push(card("Bloc réseau (RDAP / whois IP)", r.error ? errorLine(`RDAP indisponible : ${r.error}`) : [
-    kv("Nom du réseau", r.name, { mono: true }),
-    kv("Plage", r.range, { mono: true }),
+  out.push(card("Network block (RDAP / IP whois)", r.error ? errorLine(`RDAP unavailable: ${r.error}`) : [
+    kv("Network name", r.name, { mono: true }),
+    kv("Range", r.range, { mono: true }),
     r.cidr?.length ? kv("CIDR", r.cidr.join(", "), { mono: true }) : null,
-    kv("Titulaire", r.org),
+    kv("Holder", r.org),
     kv("Handle", r.handle, { mono: true }),
-    kv("Pays", r.country ? `${flag(r.country)} ${r.country}` : null),
+    kv("Country", r.country ? `${flag(r.country)} ${r.country}` : null),
     kv("RIR", r.rir, { copyable: false }),
-    kv("Contact abuse", r.abuseEmail, { mono: true }),
-    r.registration ? kv("Enregistré", fmtDate(r.registration), { copyable: false }) : null,
-    r.lastChanged ? kv("Modifié", fmtDate(r.lastChanged), { copyable: false }) : null,
+    kv("Abuse contact", r.abuseEmail, { mono: true }),
+    r.registration ? kv("Registered", fmtDate(r.registration), { copyable: false }) : null,
+    r.lastChanged ? kv("Updated", fmtDate(r.lastChanged), { copyable: false }) : null,
   ], { ico: "🗂️" }));
 
   panel.replaceChildren(...out);
@@ -445,13 +445,13 @@ function allIps() {
     seen.add(ip);
     list.push({ ip, src, connected });
   };
-  if (state.record?.ip) push(state.record.ip, "IP contactée", true);
+  if (state.record?.ip) push(state.record.ip, "Contacted IP", true);
   if (isIP(state.host)) push(state.host.replace(/^\[|\]$/g, ""), "URL");
   const d = state.dns;
   if (d) {
     for (const a of Array.isArray(d.a) ? d.a : []) push(a.data, "A (DoH)");
     for (const a of Array.isArray(d.aaaa) ? d.aaaa : []) push(a.data, "AAAA (DoH)");
-    for (const a of d.system?.addresses || []) push(a, "Résolveur Firefox");
+    for (const a of d.system?.addresses || []) push(a, "Firefox resolver");
   }
   return list;
 }
@@ -462,37 +462,37 @@ function renderDomain() {
   const out = [];
 
   if (isIP(state.host)) {
-    panel.replaceChildren(h("div", { class: "notice" }, "Le site est consulté directement via une adresse IP : pas d'informations de domaine."));
+    panel.replaceChildren(h("div", { class: "notice" }, "This site is accessed by IP address — no domain information."));
     return;
   }
 
   const dom = state.domain;
-  if (!dom) out.push(card("Whois / RDAP", loading("Requête RDAP…"), { ico: "🏷️" }));
+  if (!dom) out.push(card("Whois / RDAP", loading("RDAP lookup…"), { ico: "🏷️" }));
   else if (dom.error) out.push(card("Whois / RDAP", [errorLine(dom.error), whoisFallbackLink()], { ico: "🏷️" }));
   else {
     const d = dom.data;
     const left = d.expires ? daysLeft(d.expires) : null;
-    out.push(card("Enregistrement", [
-      kv("Domaine", d.domain, { mono: true }),
+    out.push(card("Registration", [
+      kv("Domain", d.domain, { mono: true }),
       kv("Registrar", d.registrar?.name ? h("span", null, cp(d.registrar.name), d.registrar.ianaId ? h("span", { class: "faint" }, ` · IANA ${d.registrar.ianaId}`) : null) : null, { raw: !!d.registrar?.name }),
-      d.registrar?.url ? kv("Site registrar", ext(d.registrar.url, d.registrar.url.replace(/^https?:\/\//, "")), { raw: true }) : null,
-      kv("Contact abuse", d.abuseEmail, { mono: true }),
+      d.registrar?.url ? kv("Registrar site", ext(d.registrar.url, d.registrar.url.replace(/^https?:\/\//, "")), { raw: true }) : null,
+      kv("Abuse contact", d.abuseEmail, { mono: true }),
       d.registrant && (d.registrant.org || d.registrant.name || d.registrant.country)
-        ? kv("Titulaire", [d.registrant.org || d.registrant.name, d.registrant.country && `${flag(d.registrant.country)} ${d.registrant.country}`].filter(Boolean).join(" · "))
+        ? kv("Holder", [d.registrant.org || d.registrant.name, d.registrant.country && `${flag(d.registrant.country)} ${d.registrant.country}`].filter(Boolean).join(" · "))
         : null,
-      kv("Création", d.created ? `${fmtDate(d.created)} — ${relative(d.created)}` : null, { copyable: false }),
-      kv("Dernière modif.", d.updated ? `${fmtDate(d.updated)} — ${relative(d.updated)}` : null, { copyable: false }),
-      kv("Expiration", d.expires ? h("span", { class: left < 30 ? "bad" : left < 90 ? "warn" : "ok" }, `${fmtDate(d.expires)} — ${relative(d.expires)}`) : null, { raw: !!d.expires }),
-      kv("DNSSEC", d.dnssec == null ? null : d.dnssec ? h("span", { class: "ok" }, "Délégation signée") : "Non signé", { raw: d.dnssec === true, copyable: false }),
-      kv("Statuts", d.status.length ? h("div", { class: "chips" }, d.status.map((s) => h("span", { class: "chip" }, s))) : null, { raw: d.status.length > 0 }),
-      kv("Serveurs de noms", d.nameservers.length ? h("div", null, d.nameservers.map((n) => h("div", null, cp(n, null, "mono")))) : null, { raw: d.nameservers.length > 0 }),
-      d.whoisServer ? kv("Serveur WHOIS", d.whoisServer, { mono: true }) : null,
-      h("div", { class: "small", style: "margin-top:6px;text-align:right" }, ext(d.rdapUrl, "Réponse RDAP brute ↗")),
+      kv("Created", d.created ? `${fmtDate(d.created)} — ${relative(d.created)}` : null, { copyable: false }),
+      kv("Last changed", d.updated ? `${fmtDate(d.updated)} — ${relative(d.updated)}` : null, { copyable: false }),
+      kv("Expires", d.expires ? h("span", { class: left < 30 ? "bad" : left < 90 ? "warn" : "ok" }, `${fmtDate(d.expires)} — ${relative(d.expires)}`) : null, { raw: !!d.expires }),
+      kv("DNSSEC", d.dnssec == null ? null : d.dnssec ? h("span", { class: "ok" }, "Delegation signed") : "Unsigned", { raw: d.dnssec === true, copyable: false }),
+      kv("Statuses", d.status.length ? h("div", { class: "chips" }, d.status.map((s) => h("span", { class: "chip" }, s))) : null, { raw: d.status.length > 0 }),
+      kv("Nameservers", d.nameservers.length ? h("div", null, d.nameservers.map((n) => h("div", null, cp(n, null, "mono")))) : null, { raw: d.nameservers.length > 0 }),
+      d.whoisServer ? kv("WHOIS server", d.whoisServer, { mono: true }) : null,
+      h("div", { class: "small", style: "margin-top:6px;text-align:right" }, ext(d.rdapUrl, "Raw RDAP response ↗")),
     ], { ico: "🏷️" }));
   }
 
   const d = state.dns;
-  if (!d) out.push(card("Enregistrements DNS", loading("Requêtes DNS…"), { ico: "📡" }));
+  if (!d) out.push(card("DNS records", loading("DNS queries…"), { ico: "📡" }));
   else {
     const rec = (label, list, fmt = (x) => x.data) => {
       if (!list) return null;
@@ -504,7 +504,7 @@ function renderDomain() {
     const spf = txt.filter((t) => /v=spf1/i.test(t.data));
     const other = txt.filter((t) => !/v=spf1/i.test(t.data));
     const unq = (x) => x.data.replace(/^"|"$/g, "").replace(/"\s*"/g, "");
-    out.push(card(`Enregistrements DNS — ${d.domain || d.host}`, [
+    out.push(card(`DNS records — ${d.domain || d.host}`, [
       rec("A", d.a),
       rec("AAAA", d.aaaa),
       rec("NS", d.ns, (x) => x.data.replace(/\.$/, "")),
@@ -513,7 +513,7 @@ function renderDomain() {
       rec("DMARC", d.dmarc, unq),
       rec("CAA", d.caa),
       rec("SOA", d.soa),
-      other.length ? h("details", null, h("summary", null, `Autres TXT (${other.length})`), rec("TXT", other, unq)) : null,
+      other.length ? h("details", null, h("summary", null, `Other TXT (${other.length})`), rec("TXT", other, unq)) : null,
     ], { ico: "📡" }));
   }
 
@@ -529,12 +529,12 @@ function renderCert() {
   if (!r || !sec) {
     const http = state.url.startsWith("http:");
     panel.replaceChildren(h("div", { class: `notice ${http ? "bad" : "warn"}` },
-      h("span", { class: "grow" }, http ? "Connexion non chiffrée : pas de certificat." : r?.securityError || "Les informations TLS sont capturées pendant le chargement. Rechargez la page pour les obtenir."),
-      http ? null : h("button", { class: "btn primary", onclick: reloadTab }, "Recharger")));
+      h("span", { class: "grow" }, http ? "Unencrypted connection: no certificate." : r?.securityError || "TLS details are captured during page load. Reload the page to fetch them."),
+      http ? null : h("button", { class: "btn primary", onclick: reloadTab }, "Reload")));
     return;
   }
   if (sec.state === "insecure") {
-    panel.replaceChildren(h("div", { class: "notice bad" }, "Connexion non chiffrée (HTTP) : pas de certificat."));
+    panel.replaceChildren(h("div", { class: "notice bad" }, "Unencrypted connection (HTTP): no certificate."));
     return;
   }
 
@@ -543,23 +543,23 @@ function renderCert() {
   const out = [];
 
   const ctLabels = {
-    not_configured: "Non vérifiée",
-    policy_compliant: "Conforme (SCT valides)",
-    policy_not_enough_scts: "Non conforme : SCT insuffisants",
-    policy_not_diverse_scts: "Non conforme : SCT non diversifiés",
+    not_configured: "Not checked",
+    policy_compliant: "Compliant (valid SCTs)",
+    policy_not_enough_scts: "Non-compliant: not enough SCTs",
+    policy_not_diverse_scts: "Non-compliant: SCTs not diverse",
   };
-  out.push(card("Connexion", [
-    kv("État", h("span", { class: sec.state === "secure" ? "ok" : "warn" }, sec.state === "secure" ? "Sécurisée" : sec.state), { raw: true }),
-    kv("Protocole", sec.protocolVersion, { mono: true }),
-    kv("Suite de chiffrement", sec.cipherSuite, { mono: true }),
-    kv("Échange de clés", sec.keaGroupName, { mono: true }),
+  out.push(card("Connection", [
+    kv("State", h("span", { class: sec.state === "secure" ? "ok" : "warn" }, sec.state === "secure" ? "Secure" : sec.state), { raw: true }),
+    kv("Protocol", sec.protocolVersion, { mono: true }),
+    kv("Cipher suite", sec.cipherSuite, { mono: true }),
+    kv("Key exchange", sec.keaGroupName, { mono: true }),
     kv("Signature", sec.signatureSchemeName, { mono: true }),
-    kv("HSTS", sec.hsts ? h("span", { class: "ok" }, "Oui") : "Non", { raw: !!sec.hsts, copyable: false }),
+    kv("HSTS", sec.hsts ? h("span", { class: "ok" }, "Yes") : "No", { raw: !!sec.hsts, copyable: false }),
     kv("Cert. Transparency", ctLabels[sec.certificateTransparencyStatus] ?? sec.certificateTransparencyStatus, { copyable: false }),
     sec.usedEch ? kv("ECH", h("span", { class: "ok" }, "Encrypted Client Hello"), { raw: true }) : null,
     sec.isExtendedValidation ? kv("Validation", h("span", { class: "ok" }, "EV (Extended Validation)"), { raw: true }) : null,
-    sec.weaknessReasons?.length ? kv("Faiblesses", sec.weaknessReasons.join(", ")) : null,
-    sec.errorMessage ? kv("Erreur", h("span", { class: "bad" }, sec.errorMessage), { raw: true }) : null,
+    sec.weaknessReasons?.length ? kv("Weaknesses", sec.weaknessReasons.join(", ")) : null,
+    sec.errorMessage ? kv("Error", h("span", { class: "bad" }, sec.errorMessage), { raw: true }) : null,
   ], { ico: "🔐" }));
 
   if (leaf) {
@@ -573,42 +573,42 @@ function renderCert() {
     const key = p.keyType ? `${p.keyType}${p.keySize ? " " + p.keySize + " bits" : ""}${p.keyCurve ? " " + p.keyCurve : ""}` : null;
     const san = p.san || [];
 
-    out.push(card("Certificat du site", [
-      kv("Nom commun (CN)", subj.CN?.[0], { mono: true }),
-      subj.O ? kv("Organisation", subj.O.join(", ")) : null,
-      kv("Émetteur", [iss.O?.[0], iss.CN?.[0]].filter(Boolean).join(" — ") || leaf.issuer),
-      h("div", { class: "kv" }, h("div", { class: "k" }, "Validité"),
+    out.push(card("Site certificate", [
+      kv("Common name (CN)", subj.CN?.[0], { mono: true }),
+      subj.O ? kv("Organization", subj.O.join(", ")) : null,
+      kv("Issuer", [iss.O?.[0], iss.CN?.[0]].filter(Boolean).join(" — ") || leaf.issuer),
+      h("div", { class: "kv" }, h("div", { class: "k" }, "Validity"),
         h("div", { class: "v" },
           h("div", null, `${fmtDate(start)} → ${fmtDate(end)}`),
           h("div", { class: `progress ${left < 15 ? "bad" : left < 30 ? "warn" : ""}` }, h("i", { style: `width:${pct}%` })),
           h("div", { class: `small ${left < 0 ? "bad" : left < 30 ? "warn" : "muted"}` },
-            left < 0 ? `Expiré depuis ${-left} jours` : `${left} jours restants · durée ${Math.round((end - start) / DAY)} jours`))),
+            left < 0 ? `Expired ${-left} days ago` : `${left} days left · lifetime ${Math.round((end - start) / DAY)} days`))),
       kv(`SAN (${san.length + (p.sanIps?.length || 0)})`, san.length || p.sanIps?.length
         ? h("div", null,
             h("div", { class: "chips" }, [...san, ...(p.sanIps || [])].slice(0, 24).map((n) => h("span", { class: "chip mono copy", onclick: () => copy(n) }, n))),
-            san.length > 24 ? h("details", null, h("summary", null, `Voir les ${san.length - 24} autres`),
+            san.length > 24 ? h("details", null, h("summary", null, `Show ${san.length - 24} more`),
               h("div", { class: "chips", style: "margin-top:6px" }, san.slice(24).map((n) => h("span", { class: "chip mono copy", onclick: () => copy(n) }, n)))) : null)
         : null, { raw: !!(san.length || p.sanIps?.length) }),
-      kv("Clé publique", key, { mono: true }),
-      kv("Algorithme de signature", p.signatureAlgorithm, { mono: true }),
-      p.policies?.length ? kv("Type de validation", p.policies.join(", "), { copyable: false }) : null,
-      p.eku?.length ? kv("Usages étendus", p.eku.join(", "), { copyable: false }) : null,
-      kv("Numéro de série", leaf.serialNumber, { mono: true }),
-      kv("Empreinte SHA-256", leaf.fingerprint?.sha256, { mono: true }),
-      kv("Empreinte SHA-1", leaf.fingerprint?.sha1, { mono: true }),
+      kv("Public key", key, { mono: true }),
+      kv("Signature algorithm", p.signatureAlgorithm, { mono: true }),
+      p.policies?.length ? kv("Validation type", p.policies.join(", "), { copyable: false }) : null,
+      p.eku?.length ? kv("Extended key usage", p.eku.join(", "), { copyable: false }) : null,
+      kv("Serial number", leaf.serialNumber, { mono: true }),
+      kv("SHA-256 fingerprint", leaf.fingerprint?.sha256, { mono: true }),
+      kv("SHA-1 fingerprint", leaf.fingerprint?.sha1, { mono: true }),
       kv("SPKI SHA-256", leaf.spkiSha256, { mono: true }),
       p.ocsp?.length ? kv("OCSP", p.ocsp.join("\n"), { mono: true }) : null,
       p.crl?.length ? kv("CRL", p.crl.join("\n"), { mono: true }) : null,
-      p.caIssuers?.length ? kv("Certificat émetteur", p.caIssuers.join("\n"), { mono: true }) : null,
+      p.caIssuers?.length ? kv("Issuer certificate", p.caIssuers.join("\n"), { mono: true }) : null,
       h("div", { style: "display:flex;gap:6px;justify-content:flex-end;margin-top:8px" },
-        leaf.pem ? h("button", { class: "btn", onclick: () => copy(leaf.pem) }, "Copier le PEM") : null,
-        leaf.pem ? h("button", { class: "btn", onclick: () => downloadPem(leaf.pem) }, "Télécharger .pem") : null,
+        leaf.pem ? h("button", { class: "btn", onclick: () => copy(leaf.pem) }, "Copy PEM") : null,
+        leaf.pem ? h("button", { class: "btn", onclick: () => downloadPem(leaf.pem) }, "Download .pem") : null,
         h("button", { class: "btn", onclick: () => browser.tabs.create({ url: `https://crt.sh/?q=${encodeURIComponent(registrable(state.host))}` }) }, "crt.sh ↗")),
     ], { ico: "📜" }));
   }
 
   if (certs.length) {
-    out.push(card("Chaîne de certification", h("div", { class: "chain" },
+    out.push(card("Certificate chain", h("div", { class: "chain" },
       certs.map((c, i) => {
         const end = c.validity?.end;
         const left = end ? daysLeft(end) : null;
@@ -618,8 +618,8 @@ function renderCert() {
           h("div", null,
             h("div", { style: "font-weight:600" }, dnName(c.subject)),
             h("div", { class: "small muted" },
-              [i === 0 ? "Certificat du site" : root ? (c.isBuiltInRoot ? "Racine de confiance Firefox" : "Racine") : "Intermédiaire",
-               end ? `expire le ${fmtDate(end)}${left < 30 ? ` (${left} j)` : ""}` : null,
+              [i === 0 ? "Site certificate" : root ? (c.isBuiltInRoot ? "Firefox trust root" : "Root") : "Intermediate",
+               end ? `expires ${fmtDate(end)}${left < 30 ? ` (${left}d)` : ""}` : null,
                c.parsed?.keyType ? `${c.parsed.keyType}${c.parsed.keySize ? " " + c.parsed.keySize : ""}${c.parsed.keyCurve ? " " + c.parsed.keyCurve : ""}` : null].filter(Boolean).join(" · "))));
       })), { ico: "⛓️" }));
   }
@@ -641,21 +641,21 @@ function renderHeaders() {
   const r = state.record;
   if (!r?.responseHeaders) {
     panel.replaceChildren(h("div", { class: "notice warn" },
-      h("span", { class: "grow" }, "Les en-têtes sont capturés pendant le chargement. Rechargez la page pour les obtenir."),
-      h("button", { class: "btn primary", onclick: reloadTab }, "Recharger")));
+      h("span", { class: "grow" }, "Headers are captured during page load. Reload the page to fetch them."),
+      h("button", { class: "btn primary", onclick: reloadTab }, "Reload")));
     return;
   }
   const hs = headersObj(r.responseHeaders);
   const out = [];
 
   if (r.redirects?.length) {
-    out.push(card("Chaîne de redirection", [
+    out.push(card("Redirect chain", [
       ...r.redirects.map((x) => h("div", { class: "redirect" }, h("span", { class: "code" }, x.status), cp(x.url, null, "mono"))),
       h("div", { class: "redirect" }, h("span", { class: "code ok" }, r.statusCode), cp(r.url, null, "mono")),
     ], { ico: "↪️" }));
   }
 
-  out.push(card("En-têtes de sécurité", SECURITY_HEADERS.map((s) => {
+  out.push(card("Security headers", SECURITY_HEADERS.map((s) => {
     const val = hs[s.h];
     const alt = !val && s.alt?.(hs);
     const weak = val && s.good && !s.good.test(val);
@@ -670,16 +670,16 @@ function renderHeaders() {
 
   const leaks = LEAK_HEADERS.filter((k) => hs[k]);
   if (leaks.length) {
-    out.push(card("Divulgation d'informations", leaks.map((k) => kv(k, hs[k], { mono: true })), { ico: "👁️" }));
+    out.push(card("Information disclosure", leaks.map((k) => kv(k, hs[k], { mono: true })), { ico: "👁️" }));
   }
 
-  out.push(card(`Réponse — ${r.statusLine || r.statusCode}`, h("table", null,
+  out.push(card(`Response — ${r.statusLine || r.statusCode}`, h("table", null,
     r.responseHeaders.map(({ name, value }) =>
       h("tr", null, h("td", { class: "hn" }, name), h("td", { class: "hv copy", onclick: () => copy(value) }, value)))),
   {
     flush: true,
     ico: "📄",
-    extra: h("button", { class: "btn", onclick: () => copy(r.responseHeaders.map((x) => `${x.name}: ${x.value}`).join("\n")) }, "Copier tout"),
+    extra: h("button", { class: "btn", onclick: () => copy(r.responseHeaders.map((x) => `${x.name}: ${x.value}`).join("\n")) }, "Copy all"),
   }));
 
   panel.replaceChildren(...out);
@@ -757,7 +757,7 @@ async function init() {
     document.getElementById("url").textContent = tab.url || "";
     document.getElementById("tabs").style.display = "none";
     document.getElementById("refresh").style.display = "none";
-    document.getElementById("main").replaceChildren(h("div", { class: "empty" }, "Cette page ne peut pas être analysée.", h("br"), h("span", { class: "small faint" }, "Seules les pages http:// et https:// sont prises en charge.")));
+    document.getElementById("main").replaceChildren(h("div", { class: "empty" }, "This page cannot be analyzed.", h("br"), h("span", { class: "small faint" }, "Only http:// and https:// pages are supported.")));
     return;
   }
 
@@ -799,5 +799,5 @@ async function init() {
 }
 
 init().catch((e) => {
-  document.getElementById("main").replaceChildren(errorLine(`Erreur : ${e.message}`));
+  document.getElementById("main").replaceChildren(errorLine(`Error: ${e.message}`));
 });

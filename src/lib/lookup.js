@@ -40,7 +40,7 @@
       }
       return await r.json();
     } catch (e) {
-      if (e.name === "AbortError") throw new Error("Délai dépassé");
+      if (e.name === "AbortError") throw new Error("Timed out");
       throw e;
     } finally {
       clearTimeout(timer);
@@ -115,7 +115,7 @@
   async function geo(ip) {
     try {
       const j = await fetchJSON(`https://ipwho.is/${encodeURIComponent(ip)}`, { timeout: 7000 });
-      if (j.success === false) throw new Error(j.message || "ipwho.is: échec");
+      if (j.success === false) throw new Error(j.message || "ipwho.is: failed");
       return {
         source: "ipwho.is",
         ip: j.ip,
@@ -261,7 +261,7 @@
   function rdapDomain(host) {
     return cached(`rdapdom:${host}`, async () => {
       const base = registrableDomain(host);
-      if (!base) throw new Error("Pas de nom de domaine");
+      if (!base) throw new Error("Not a domain name");
       const labels = host.toLowerCase().split(".");
       const baseLen = base.split(".").length;
       const candidates = [base];
@@ -293,8 +293,8 @@
           if (e.status !== 404) break;
         }
       }
-      if (lastErr?.status === 404) throw new Error("Domaine introuvable ou TLD sans service RDAP");
-      throw lastErr || new Error("RDAP indisponible");
+      if (lastErr?.status === 404) throw new Error("Domain not found or TLD has no RDAP service");
+      throw lastErr || new Error("RDAP unavailable");
     });
   }
 

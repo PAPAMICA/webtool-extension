@@ -1,0 +1,45 @@
+{
+  "manifest_version": 2,
+  "name": "WebTool Inspector",
+  "version": "1.0.0",
+  "description": "Technologies, IP, ASN, WHOIS/RDAP, DNS, certificat TLS et en-têtes HTTP du site courant en un coup d'œil.",
+  "icons": {
+    "48": "icons/icon.svg",
+    "96": "icons/icon.svg"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "webtool-inspector@papamica",
+      "strict_min_version": "115.0"
+    }
+  },
+  "permissions": [
+    "<all_urls>",
+    "webRequest",
+    "webRequestBlocking",
+    "tabs",
+    "dns",
+    "cookies"
+  ],
+  "background": {
+    "scripts": [
+      "src/lib/technologies.js",
+      "src/lib/detector.js",
+      "src/lib/x509.js",
+      "src/lib/lookup.js",
+      "src/background.js"
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["src/lib/technologies.js", "src/content/collect.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "browser_action": {
+    "default_popup": "src/popup/popup.html",
+    "default_icon": "icons/icon.svg",
+    "default_title": "WebTool Inspector"
+  }
+}

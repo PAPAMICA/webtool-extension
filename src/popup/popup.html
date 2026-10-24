@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="hero-top">
+        <img id="favicon" class="favicon" alt="" />
+        <div class="hero-id">
+          <div id="host" class="host">…</div>
+          <div id="url" class="url"></div>
+        </div>
+        <button id="refresh" class="icon-btn" title="Relancer l'analyse">
+          <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+        </button>
+      </div>
+      <div id="pills" class="pills"></div>
+    </header>
+
+    <nav id="tabs" class="tabs">
+      <button data-tab="overview" class="active">Aperçu</button>
+      <button data-tab="tech">Technos <span class="count" id="count-tech"></span></button>
+      <button data-tab="ip">IP / ASN</button>
+      <button data-tab="domain">Domaine</button>
+      <button data-tab="cert">Certificat</button>
+      <button data-tab="headers">En-têtes</button>
+    </nav>
+
+    <main id="main">
+      <section id="panel-overview" class="panel active"></section>
+      <section id="panel-tech" class="panel"></section>
+      <section id="panel-ip" class="panel"></section>
+      <section id="panel-domain" class="panel"></section>
+      <section id="panel-cert" class="panel"></section>
+      <section id="panel-headers" class="panel"></section>
+    </main>
+
+    <div id="toast" class="toast"></div>
+    <script src="popup.js"></script>
+  </body>
+</html>

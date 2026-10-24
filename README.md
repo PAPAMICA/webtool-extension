@@ -27,16 +27,30 @@ Technologies, IP / ASN, WHOIS / RDAP, DNS, TLS certificate and HTTP headers — 
 
 Also includes quick links to OSINT tools (Shodan, Censys, VirusTotal, crt.sh, SSL Labs, and more), prefilled with the current host / IP / ASN.
 
-## Install (temporary)
+## Install (temporary — development)
 
 1. Open `about:debugging#/runtime/this-firefox` in Firefox
 2. Click **Load Temporary Add-on…**
 3. Select `manifest.json` from this folder
 4. Reload open tabs — certificate and headers are captured during page load
 
+Temporary add-ons are removed when Firefox restarts.
+
+## Publish on Firefox Add-ons (AMO)
+
+Everything needed for submission is documented in [`AMO.md`](AMO.md) (listing copy, reviewer notes, checklist).
+
+```bash
+./scripts/package.sh
+# → web-ext-artifacts/webtool_inspector-1.0.0.zip
+```
+
+Then upload that ZIP at [addons.mozilla.org/developers](https://addons.mozilla.org/developers/addon/submit/).  
+Privacy policy: [`PRIVACY.md`](PRIVACY.md).
+
 ## Privacy note
 
-Lookups for IP geolocation / ASN, DNS-over-HTTPS and RDAP contact third-party services (Cloudflare DoH, ipwho.is, rdap.org). No API keys are required. Keep that in mind during sensitive investigations.
+Lookups for IP geolocation / ASN, DNS-over-HTTPS and RDAP contact third-party services (Cloudflare DoH, ipwho.is, ipinfo.io, rdap.org). Technology logos load from Simple Icons / favicon CDN. No API keys are required. See [PRIVACY.md](PRIVACY.md).
 
 ## Stack
 

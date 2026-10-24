@@ -2,15 +2,24 @@
   "manifest_version": 2,
   "name": "WebTool Inspector",
   "version": "1.0.0",
-  "description": "Technologies, IP, ASN, WHOIS/RDAP, DNS, TLS certificate and HTTP headers for the current site \u2014 at a glance.",
+  "description": "Technologies, IP, ASN, WHOIS/RDAP, DNS, TLS certificate and HTTP headers for the current site — at a glance.",
+  "author": "PAPAMICA",
+  "homepage_url": "https://github.com/PAPAMICA/webtool-extension",
   "icons": {
-    "48": "icons/icon.svg",
-    "96": "icons/icon.svg"
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png",
+    "128": "icons/icon-128.png"
   },
   "browser_specific_settings": {
     "gecko": {
       "id": "webtool-inspector@papamica",
-      "strict_min_version": "115.0"
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": [
+          "browsingActivity",
+          "websiteContent"
+        ]
+      }
     }
   },
   "permissions": [
@@ -27,6 +36,7 @@
       "src/lib/detector.js",
       "src/lib/x509.js",
       "src/lib/lookup.js",
+      "src/lib/version-probe.js",
       "src/background.js"
     ]
   },
@@ -45,7 +55,10 @@
   ],
   "browser_action": {
     "default_popup": "src/popup/popup.html",
-    "default_icon": "icons/icon.svg",
+    "default_icon": {
+      "48": "icons/icon-48.png",
+      "96": "icons/icon-96.png"
+    },
     "default_title": "WebTool Inspector"
   }
 }

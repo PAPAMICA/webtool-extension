@@ -112,6 +112,8 @@
         ],
         html: [
           /wp-emoji-release\.min\.js\?ver=(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?(?:-[a-zA-Z][\w.-]*)?)(?:[&"']|$)/i,
+          /wordpress\.org\/\?v=(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?(?:-[a-zA-Z][\w.-]*)?)/i,
+          /<generator[^>]*>\s*(?:<!\[CDATA\[)?\s*https?:\/\/wordpress\.org\/\?v=([\w.-]+)/i,
           /<link[^>]+\/wp-json\//i,
         ],
         cookies: { "wp-settings-*": "", "wordpress_logged_in_*": "", "wordpress_test_cookie": "" },

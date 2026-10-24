@@ -158,10 +158,15 @@
 
     const html = document.documentElement ? document.documentElement.outerHTML.slice(0, 400000) : "";
 
+    const feeds = [];
+    for (const l of document.querySelectorAll('link[type="application/rss+xml"], link[type="application/atom+xml"]')) {
+      if (l.href) feeds.push(l.href);
+    }
+
     browser.runtime
       .sendMessage({
         type: "signals",
-        signals: { url: location.href, title: document.title, js, dom, meta, src: [...src], html },
+        signals: { url: location.href, title: document.title, js, dom, meta, src: [...src], html, feeds },
       })
       .catch(() => {});
   }

@@ -149,8 +149,58 @@ async function runDetection(tabId) {
     cookies,
     certIssuer: r.security?.certificates?.[0]?.issuer,
   });
+  try {
+    await enrichVersions(r, headers);
+  } catch (e) {
+    /* probes are best-effort */
+  }
   updateBadge(tabId, r.techs.length);
   return r.techs;
+}
+
+function findTech(techs, name) {
+  return (techs || []).find((t) => t.name === name);
+}
+
+function setTechVersion(tech, version, via) {
+  if (!tech || !version) return false;
+  if (tech.version === version) {
+    if (via && !tech.via.includes(via)) tech.via.push(via);
+    return false;
+  }
+  tech.version = version;
+  if (via && !tech.via.includes(via)) tech.via.push(via);
+  return true;
+}
+
+async function enrichVersions(record, headers) {
+  if (!record?.techs?.length) return;
+  const pageUrl = record.signals?.url || record.url;
+  if (!pageUrl || !/^https?:/i.test(pageUrl)) return;
+
+  const wp = findTech(record.techs, "WordPress");
+  const php = findTech(record.techs, "PHP");
+  const needsWp = wp && !WT_versionProbe.okWp(wp.version);
+  const needsPhp = php && !WT_versionProbe.okPhp(php.version);
+
+  const tasks = [];
+  if (needsWp) {
+    tasks.push(
+      WT_versionProbe
+        .probeWordPressVersion(pageUrl, { feeds: record.signals?.feeds || [], html: record.signals?.html || "" })
+        .then((hit) => {
+          if (hit) setTechVersion(wp, hit.version, hit.via);
+        })
+    );
+  }
+  if (needsPhp) {
+    tasks.push(
+      WT_versionProbe.probePhpVersion(pageUrl, headers).then((hit) => {
+        if (hit) setTechVersion(php, hit.version, hit.via);
+      })
+    );
+  }
+  if (tasks.length) await Promise.all(tasks);
 }
 
 function updateBadge(tabId, n) {

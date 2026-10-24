@@ -37,6 +37,15 @@ const CAT_LABELS = {
   fonts: "Fonts / icons", media: "Video / media", maps: "Maps", build: "Build / bundler", misc: "Misc",
 };
 const catLabel = (t) => CAT_LABELS[t.cat] || t.catLabel || t.cat;
+const VIA_LABELS = {
+  "en-tête": "header", header: "header", meta: "meta", js: "js", script: "script", cookie: "cookie",
+  html: "html", url: "url", cdn: "cdn", file: "file", fichier: "file", "?ver": "?ver",
+  certificate: "certificate", certificat: "certificate", implied: "implied", déduit: "implied",
+  dom: "dom", feed: "feed", probe: "probe",
+};
+const viaLabel = (v) => VIA_LABELS[v] || v;
+const viaText = (t) => (t.via || []).map(viaLabel).join(", ");
+const techBadge = (t) => t.version || t.tag || null;
 
 // ───────────── DOM helpers ─────────────
 function h(tag, props, ...kids) {
@@ -276,8 +285,10 @@ function renderOverview() {
   else {
     const shown = state.techs.filter((t) => !t.implied).slice(0, 18);
     techBody = h("div", { class: "chips" },
-      shown.map((t) => h("span", { class: "chip", title: catLabel(t) },
-        h("i", { style: `width:7px;height:7px;border-radius:2px;background:${t.color}` }), t.name, t.version ? h("span", { class: "ver" }, t.version) : null)),
+      shown.map((t) => h("span", { class: "chip tech-chip", title: catLabel(t) },
+        techIcon(t, "tech-chip-ico"),
+        h("span", { class: "tech-chip-name" }, t.name),
+        techBadge(t) ? h("span", { class: "ver" }, techBadge(t)) : null)),
       state.techs.length > shown.length ? h("span", { class: "chip click", onclick: () => switchTab("tech") }, `+${state.techs.length - shown.length} …`) : null);
   }
   const techCard = card("Technologies", techBody, {
@@ -341,12 +352,66 @@ function whoisFallbackLink() {
 }
 
 // ───────────── Render: technologies ─────────────
+function techIcon(t, sizeClass = "tech-widget-ico") {
+  const initials = t.name.replace(/[^A-Za-z0-9]/g, "").slice(0, 2) || "?";
+  const logos = globalThis.WT_logos?.getTechLogo(t) || {};
+  const tint = `background:${t.color}18;color:${t.color}`;
+  const wrap = h("div", { class: sizeClass, style: tint }, initials);
+
+  if (!logos.primary) return wrap;
+
+  const img = h("img", {
+    class: "tech-logo",
+    src: logos.primary,
+    alt: "",
+    loading: "lazy",
+    referrerpolicy: "no-referrer",
+  });
+  img.addEventListener("error", () => {
+    if (logos.fallback && img.dataset.fb !== "1") {
+      img.dataset.fb = "1";
+      img.src = logos.fallback;
+      return;
+    }
+    img.remove();
+    wrap.classList.remove("has-logo");
+    wrap.classList.add("no-logo");
+    wrap.style.cssText = tint;
+    wrap.textContent = initials;
+  });
+  wrap.classList.add("has-logo");
+  wrap.style.cssText = "";
+  wrap.textContent = "";
+  wrap.append(img);
+  return wrap;
+}
+
+function techWidget(t) {
+  const badge = techBadge(t);
+  const tip = [
+    catLabel(t),
+    t.implied ? `implied by ${t.impliedBy}` : viaText(t) ? `via ${viaText(t)}` : null,
+    t.confidence < 100 ? `likely ${t.confidence}%` : null,
+  ].filter(Boolean).join(" · ");
+  return h("div", {
+    class: `tech-widget${t.implied ? " implied" : ""}`,
+    title: tip,
+    style: `--tech: ${t.color}`,
+  },
+    techIcon(t),
+    h("div", { class: "tech-widget-body" },
+      h("div", { class: "tech-widget-name" }, t.website ? ext(t.website, t.name) : t.name),
+      h("div", { class: "tech-widget-sub" },
+        t.implied ? `via ${t.impliedBy}` : viaText(t))),
+    badge ? h("span", { class: `tech-widget-badge${t.tag && !t.version ? " tag" : ""}` }, badge) : null);
+}
+
 function renderTech() {
   const panel = document.getElementById("panel-tech");
   const actions = h("div", { style: "display:flex;gap:6px" },
     state.techs?.length ? h("button", {
       class: "btn",
-      onclick: () => copy(state.techs.map((t) => `${t.name}${t.version ? " " + t.version : ""} — ${catLabel(t)}`).join("\n")),
+      onclick: () => copy(state.techs.map((t) => `${t.name}${techBadge(t) ? " " + techBadge(t) : ""} — ${catLabel(t)}`).join("\n")),
     }, "Copy list") : null,
     h("button", { class: "btn", onclick: () => doRescan() }, state.scanning ? "Scanning…" : "Rescan"));
 
@@ -367,16 +432,11 @@ function renderTech() {
 
   const body = [...groups.values()].map((items) =>
     h("div", { class: "tech-group" },
-      h("div", { class: "tech-cat" }, h("i", { style: `background:${items[0].color}` }), catLabel(items[0])),
-      items.map((t) =>
-        h("div", { class: "tech" },
-          h("div", { class: "avatar", style: `background:${t.color}26;color:${t.color}` }, t.name.replace(/[^A-Za-z0-9]/g, "").slice(0, 2) || "?"),
-          h("div", null,
-            h("div", { class: "tech-name" }, t.website ? ext(t.website, t.name) : t.name),
-            h("div", { class: "tech-meta" },
-              t.confidence < 100 ? h("span", { class: "warn" }, `likely (${t.confidence}%) · `) : null,
-              t.implied ? `implied by ${t.impliedBy}` : `detected via ${t.via.join(", ")}`)),
-          t.version ? h("span", { class: "ver" }, t.version) : null))));
+      h("div", { class: "tech-cat" },
+        h("i", { style: `background:${items[0].color}` }),
+        catLabel(items[0]),
+        h("span", { class: "tech-cat-n" }, items.length)),
+      h("div", { class: "tech-grid" }, items.map(techWidget))));
 
   panel.replaceChildren(card(`${state.techs.length} technologies`, body, { flush: true, extra: actions }));
 }

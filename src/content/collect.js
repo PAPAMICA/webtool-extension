@@ -115,12 +115,19 @@
   };
 
   function collect() {
-    const { technologies } = globalThis.WT_DB;
+    const db = globalThis.WT_DB;
+    if (!db?.technologies) return;
+    const { technologies } = db;
     const jsKeys = new Set();
     const selectors = new Set();
     for (const t of Object.values(technologies)) {
       if (t.js) for (const k of Object.keys(t.js)) jsKeys.add(k);
-      if (t.dom) for (const s of t.dom) selectors.add(typeof s === "string" ? s : s.v);
+      if (t.dom) {
+        for (const s of Array.isArray(t.dom) ? t.dom : [t.dom]) {
+          const sel = typeof s === "string" ? s : s?.v;
+          if (typeof sel === "string" && sel) selectors.add(sel);
+        }
+      }
     }
 
     const js = {};

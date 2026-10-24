@@ -104,18 +104,10 @@
       // ═════════════ CMS ═════════════
       WordPress: {
         cat: "cms", w: "https://wordpress.org",
-        /* Version must look like 6.4 / 6.4.2 / 7.2-beta1-64690 — never a cache-busting hash (66c613f…). */
-        meta: { generator: /^WordPress(?:\s+(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?(?:-[a-zA-Z][\w.-]*)?))?/i },
-        src: [
-          /\/wp-includes\/(?:css\/dist\/block-library\/style(?:\.min)?\.css|js\/wp-emoji-release\.min\.js|css\/dashicons(?:\.min)?\.css|js\/comment-reply(?:\.min)?\.js|css\/admin-bar(?:\.min)?\.css)\?ver=(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?(?:-[a-zA-Z][\w.-]*)?)(?:[&"']|$)/i,
-          /\/wp-(?:content|includes)\//,
-        ],
-        html: [
-          /wp-emoji-release\.min\.js\?ver=(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?(?:-[a-zA-Z][\w.-]*)?)(?:[&"']|$)/i,
-          /wordpress\.org\/\?v=(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?(?:-[a-zA-Z][\w.-]*)?)/i,
-          /<generator[^>]*>\s*(?:<!\[CDATA\[)?\s*https?:\/\/wordpress\.org\/\?v=([\w.-]+)/i,
-          /<link[^>]+\/wp-json\//i,
-        ],
+        /* Presence only — core version is resolved separately (never guess from a single ?ver=). */
+        meta: { generator: /^WordPress\b/i },
+        src: [/\/wp-(?:content|includes)\//],
+        html: [/<link[^>]+\/wp-json\//i, /wp-emoji-release\.min\.js/i, /\/wp-(?:content|includes)\//i],
         cookies: { "wp-settings-*": "", "wordpress_logged_in_*": "", "wordpress_test_cookie": "" },
         headers: { link: /rel="https:\/\/api\.w\.org\/"/, "x-pingback": /\/xmlrpc\.php/ },
         implies: ["PHP", "MySQL"],

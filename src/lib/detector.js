@@ -20,7 +20,8 @@
   /* Cache-busting hashes / build ids mistaken for versions (66c613f…, 4716, 20240101). */
   const HASHISH = /^(?:[0-9a-f]{8,}|[0-9]{2,}[a-f][0-9a-f]+)$/i;
   const SEMVERISH = /^\d+\.\d+/; /* real lib/CMS versions almost always have major.minor */
-  const WP_VER_OK = /^\d{1,2}\.\d{1,2}(?:\.\d{1,2})?(?:-[a-zA-Z][\w.-]*)?$/;
+  /* Core WP only: 3.x–9.x. Plugins may use the same shape via cleanPluginVer. */
+  const WP_CORE_VER = /^(\d{1,2})\.(\d{1,2})(?:\.(\d{1,2}))?(?:-[a-zA-Z][\w.-]*)?$/;
 
   function cleanVersion(v) {
     if (v == null) return null;
@@ -30,11 +31,20 @@
     return v;
   }
 
-  /** Versions from WordPress ?ver= query params (core, plugins, themes). */
+  function okWpCore(v) {
+    v = cleanVersion(v);
+    if (!v) return null;
+    const m = WP_CORE_VER.exec(v);
+    if (!m) return null;
+    const major = Number(m[1]);
+    if (major < 3 || major > 9) return null;
+    return v;
+  }
+
+  /** Plugin/theme ?ver= — semver-ish, not a hash. */
   function cleanWpVer(v) {
     v = cleanVersion(v);
-    if (!v || !WP_VER_OK.test(v)) return null;
-    return v;
+    return v && SEMVERISH.test(v) ? v : null;
   }
 
   function norm(p) {
@@ -46,8 +56,14 @@
     if (value == null) return null;
     const n = norm(p);
     if (n.re == null || n.re === "") return { version: n.fixed, c: n.c, raw: !!n.fixed };
+    if (!(n.re instanceof RegExp)) return null;
     const m = n.re.exec(String(value));
     return m ? { version: n.fixed || m[1] || null, c: n.c, raw: !!n.fixed } : null;
+  }
+
+  function asList(v) {
+    if (v == null) return [];
+    return Array.isArray(v) ? v : [v];
   }
 
   let IDX = null;
@@ -85,21 +101,21 @@
   function detect(s) {
     const { technologies, categories } = globalThis.WT_DB;
     const idx = index();
-    const headers = s.headers || {};
-    const cookies = s.cookies || {};
-    const meta = s.meta || {};
-    const js = s.js || {};
-    const dom = s.dom || {};
-    const src = s.src || [];
-    const html = s.html || "";
-    const url = s.url || "";
+    const headers = s.headers && typeof s.headers === "object" ? s.headers : {};
+    const cookies = s.cookies && typeof s.cookies === "object" ? s.cookies : {};
+    const meta = s.meta && typeof s.meta === "object" && !Array.isArray(s.meta) ? s.meta : {};
+    const js = s.js && typeof s.js === "object" && !Array.isArray(s.js) ? s.js : {};
+    const dom = s.dom && typeof s.dom === "object" && !Array.isArray(s.dom) ? s.dom : {};
+    const src = Array.isArray(s.src) ? s.src : [];
+    const html = typeof s.html === "string" ? s.html : "";
+    const url = typeof s.url === "string" ? s.url : "";
     const cookieNames = Object.keys(cookies);
     const found = new Map();
 
     const add = (name, version, via, conf = 100, extra, raw = false) => {
       version = raw ? version : cleanVersion(version);
-      /* WordPress core must look like 6.4.2 — never a bare build id like 4716. */
-      if (name === "WordPress" && version && !WP_VER_OK.test(version)) version = null;
+      /* WordPress core version is never taken from generic signature hits. */
+      if (name === "WordPress") version = null;
       /* Non-semver labels (UA, GA4, …) are tags, not version numbers. */
       if (version && !SEMVERISH.test(version) && !/^\d{1,3}$/.test(version)) {
         extra = { ...(extra || {}), tag: version };
@@ -146,7 +162,8 @@
       }
       if (t.meta) {
         for (const [k, p] of Object.entries(t.meta)) {
-          for (const v of meta[k] || []) {
+          for (const v of asList(meta[k])) {
+            if (typeof v !== "string") continue;
             const r = test(p, v);
             if (r) add(name, r.version, "meta", r.c, undefined, r.raw);
           }
@@ -161,13 +178,13 @@
         }
       }
       if (t.dom) {
-        for (const d of t.dom) {
+        for (const d of asList(t.dom)) {
           const n = norm(d);
-          if (dom[n.re]) add(name, null, "dom", n.c);
+          if (n.re && dom[n.re]) add(name, null, "dom", n.c);
         }
       }
       if (t.src) {
-        for (const p of t.src) {
+        for (const p of asList(t.src)) {
           for (const u of src) {
             const r = test(p, u);
             if (r) { add(name, r.version, "script", r.c, undefined, r.raw); break; }
@@ -175,7 +192,7 @@
         }
       }
       if (t.html && html) {
-        for (const p of t.html) {
+        for (const p of asList(t.html)) {
           const r = test(p, html);
           if (r) add(name, r.version, "html", r.c, undefined, r.raw);
         }
@@ -232,7 +249,7 @@
       for (const [key, counts] of wpAssets) {
         const [kind, slug] = key.split(":");
         let version = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
-        if (version && (version === wpVersion || !WP_VER_OK.test(version))) version = null;
+        if (version && (version === wpVersion || !cleanWpVer(version))) version = null;
         const display = idx.wpSlugs[slug] || prettify(slug);
         if (technologies[display]) {
           add(display, version, "script");
@@ -263,8 +280,8 @@
         add(m[1], m[2], "header", 100, { cat, generic: true });
       }
     }
-    for (const v of meta.generator || []) {
-      if (v.length > 60 || idx.metaGenerators.some((p) => test(p, v))) continue;
+    for (const v of asList(meta.generator)) {
+      if (typeof v !== "string" || v.length > 60 || idx.metaGenerators.some((p) => test(p, v))) continue;
       const m = /^(.+?)(?:\s+v?(\d[\w.-]*))?$/.exec(v.trim());
       if (!m || known(m[1])) continue;
       add(m[1], m[2], "meta", 100, { cat: "misc", generic: true });
@@ -275,7 +292,8 @@
     while (queue.length) {
       const n = queue.shift();
       const parent = found.get(n);
-      for (const imp of technologies[n]?.implies || []) {
+      for (const imp of asList(technologies[n]?.implies)) {
+        if (typeof imp !== "string" || !imp) continue;
         const existing = found.get(imp);
         if (existing) {
           if (existing.confidence < parent.confidence) {
@@ -290,7 +308,7 @@
       }
     }
 
-    enrichWordpressVersion(found, src, html);
+    enrichWordpressVersion(found, src, html, meta);
     enrichPhpVersion(found, headers, html);
 
     const order = Object.keys(categories);
@@ -312,46 +330,71 @@
   }
 
   /**
-   * Consensus version from every /wp-includes/…?ver=semver asset (ignores hashes / build ids).
-   * Also picks up an in-page wordpress.org/?v=… generator snippet when present.
+   * WordPress core version — conservative.
+   * Accept only:
+   *   A) meta generator "WordPress X.Y.Z"
+   *   B) RSS/Atom generator https://wordpress.org/?v=X.Y.Z (in page HTML if present)
+   *   C) ≥2 distinct whitelisted /wp-includes/ core assets agreeing on the same ?ver=
+   * Otherwise leave version empty (never guess from a single ?ver= / jQuery / plugin).
    */
-  const WP_INCLUDES_VER = /\/wp-includes\/[^"'?\s]+(?:\.(?:js|css))\?ver=(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?(?:-[a-zA-Z][\w.-]*)?)/gi;
-  const WP_FEED_VER = /wordpress\.org\/\?v=([\w.-]+)/i;
+  const WP_META_VER = /<meta[^>]+name=["']generator["'][^>]+content=["']WordPress\s+([\w.-]+)["']/i;
+  const WP_META_VER_REV = /<meta[^>]+content=["']WordPress\s+([\w.-]+)["'][^>]+name=["']generator["']/i;
+  const WP_GENERATOR_URL = /<(?:[a-z0-9:]*)generator[^>]*>\s*(?:<!\[CDATA\[\s*)?https?:\/\/wordpress\.org\/\?v=([\w.-]+)/i;
+  const WP_GENERATOR_NAME = /<(?:[a-z0-9:]*)generator[^>]*>\s*(?:<!\[CDATA\[\s*)?WordPress\s+([\w.-]+)/i;
+  /* Filenames that always ship with $wp_version — NOT jquery/tinymce/vendor libs. */
+  const WP_CORE_ASSET =
+    /\/wp-includes\/(?:js\/(?:wp-emoji-release|comment-reply|wp-embed|wp-util|wp-a11y|hoverintent-js|zxcvbn(?:-async)?)|css\/(?:dashicons|admin-bar|buttons|editor|jquery-ui-dialog|wp-auth-check)|css\/dist\/block-library\/style)(?:\.min)?\.(?:js|css)\?ver=([\w.-]+)/gi;
 
-  function enrichWordpressVersion(found, src, html) {
+  function enrichWordpressVersion(found, src, html, meta) {
     if (!found.has("WordPress")) return;
-    const counts = new Map();
-    const bump = (raw) => {
-      const v = cleanWpVer(raw);
-      if (v) counts.set(v, (counts.get(v) || 0) + 1);
-    };
-    for (const u of src || []) {
-      WP_INCLUDES_VER.lastIndex = 0;
-      let m;
-      while ((m = WP_INCLUDES_VER.exec(u))) bump(m[1]);
-    }
-    if (html) {
-      WP_INCLUDES_VER.lastIndex = 0;
-      let m;
-      while ((m = WP_INCLUDES_VER.exec(html))) bump(m[1]);
-      const feed = WP_FEED_VER.exec(html);
-      if (feed) bump(feed[1]);
-    }
-    if (!counts.size) return;
-    const best = [...counts.entries()].sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)[0][0];
     const wp = found.get("WordPress");
-    const cur = wp.version;
-    const take =
-      !cur ||
-      !WP_VER_OK.test(cur) ||
-      (counts.get(best) >= 2 && best !== cur) ||
-      best.startsWith(`${cur}-`) ||
-      best.startsWith(`${cur}.`);
-    if (take) {
-      wp.version = best;
-      wp.vprio = Math.max(wp.vprio || 0, PRIO.script);
-      if (!wp.via.includes("script") && !wp.via.includes("html")) wp.via.push("script");
+    wp.version = null;
+
+    const set = (raw, via) => {
+      const v = okWpCore(raw);
+      if (!v) return false;
+      wp.version = v;
+      wp.vprio = Math.max(wp.vprio || 0, PRIO[via] || 1);
+      if (!wp.via.includes(via)) wp.via.push(via);
+      return true;
+    };
+
+    for (const g of asList(meta?.generator)) {
+      if (typeof g !== "string") continue;
+      const m = /^WordPress\s+([\w.-]+)/i.exec(g.trim());
+      if (m && set(m[1], "meta")) return;
     }
+
+    if (html) {
+      for (const re of [WP_META_VER, WP_META_VER_REV, WP_GENERATOR_URL, WP_GENERATOR_NAME]) {
+        const m = re.exec(html);
+        if (m && set(m[1], "html")) return;
+      }
+    }
+
+    /* Consensus across distinct core asset paths (path → version). */
+    const byPath = new Map();
+    const scan = (text) => {
+      if (!text) return;
+      WP_CORE_ASSET.lastIndex = 0;
+      let m;
+      while ((m = WP_CORE_ASSET.exec(text))) {
+        const v = okWpCore(m[1]);
+        if (!v) continue;
+        const path = m[0].split("?")[0].replace(/^https?:\/\/[^/]+/i, "");
+        byPath.set(path, v);
+      }
+    };
+    for (const u of src || []) scan(u);
+    scan(html);
+
+    if (byPath.size < 2) return;
+    const tallies = new Map();
+    for (const v of byPath.values()) tallies.set(v, (tallies.get(v) || 0) + 1);
+    const ranked = [...tallies.entries()].sort((a, b) => b[1] - a[1] || b[0].length - a[0].length);
+    const [best, n] = ranked[0];
+    /* Require at least 2 assets on the winning version; no ties. */
+    if (n >= 2 && (ranked.length === 1 || ranked[1][1] < n)) set(best, "script");
   }
 
   /**

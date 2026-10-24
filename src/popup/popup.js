@@ -848,10 +848,11 @@ async function init() {
   });
 
   state.record = await browser.runtime.sendMessage({ type: "getTab", tabId: tab.id });
-  if (state.record?.hasSignals) state.techs = state.record.techs;
+  if (state.record?.hasSignals && Array.isArray(state.record.techs)) state.techs = state.record.techs;
   renderAll();
 
-  if (!state.record?.hasSignals) doRescan();
+  /* Always rescan when nothing was detected yet (stale tab, failed inject, etc.). */
+  if (!state.record?.hasSignals || !state.techs?.length) doRescan();
 
   if (isIP(state.host)) {
     selectIp(state.host);

@@ -138,23 +138,36 @@ async function runDetection(tabId) {
     if (m) cookies[m[1]] = m[2];
   }
   try {
-    for (const c of await browser.cookies.getAll({ url: s.url || r.url })) cookies[c.name] = c.value;
+    const url = s.url || r.url;
+    if (url) {
+      for (const c of await browser.cookies.getAll({ url })) cookies[c.name] = c.value;
+    }
   } catch (e) {
     /* URL not compatible with the cookies API */
   }
-  r.techs = WT_detect({
-    ...s,
-    url: s.url || r.url,
-    headers,
-    cookies,
-    certIssuer: r.security?.certificates?.[0]?.issuer,
-  });
   try {
-    await enrichVersions(r, headers);
+    r.techs = WT_detect({
+      ...s,
+      url: s.url || r.url,
+      headers,
+      cookies,
+      src: Array.isArray(s.src) ? s.src : [],
+      meta: s.meta && typeof s.meta === "object" ? s.meta : {},
+      js: s.js && typeof s.js === "object" ? s.js : {},
+      dom: s.dom && typeof s.dom === "object" ? s.dom : {},
+      html: typeof s.html === "string" ? s.html : "",
+      certIssuer: r.security?.certificates?.[0]?.issuer,
+    });
   } catch (e) {
-    /* probes are best-effort */
+    console.error("WT_detect failed", e);
+    r.techs = [];
+    r.detectError = e.message || String(e);
   }
   updateBadge(tabId, r.techs.length);
+  /* Version probes must not block scan completion (feeds/PHP can take >20s). */
+  enrichVersions(r, headers)
+    .then(() => updateBadge(tabId, r.techs?.length || 0))
+    .catch(() => {});
   return r.techs;
 }
 
@@ -180,7 +193,11 @@ async function enrichVersions(record, headers) {
 
   const wp = findTech(record.techs, "WordPress");
   const php = findTech(record.techs, "PHP");
-  const needsWp = wp && !WT_versionProbe.okWp(wp.version);
+
+  /* Drop any WordPress version that isn't a trusted core semver. */
+  if (wp && !WT_versionProbe.okWp(wp.version)) wp.version = null;
+
+  const needsWp = wp && !wp.version;
   const needsPhp = php && !WT_versionProbe.okPhp(php.version);
 
   const tasks = [];
@@ -189,7 +206,9 @@ async function enrichVersions(record, headers) {
       WT_versionProbe
         .probeWordPressVersion(pageUrl, { feeds: record.signals?.feeds || [], html: record.signals?.html || "" })
         .then((hit) => {
-          if (hit) setTechVersion(wp, hit.version, hit.via);
+          const v = hit && WT_versionProbe.okWp(hit.version);
+          if (v) setTechVersion(wp, v, hit.via);
+          else wp.version = null;
         })
     );
   }
@@ -214,7 +233,7 @@ async function rescan(tabId) {
     const timer = setTimeout(() => {
       pendingScans.delete(tabId);
       resolve(false);
-    }, 5000);
+    }, 12000);
     pendingScans.set(tabId, () => {
       clearTimeout(timer);
       resolve(true);
@@ -253,9 +272,10 @@ browser.runtime.onMessage.addListener((msg, sender) => {
         tabs.set(tabId, r);
       }
       r.signals = msg.signals;
-      return runDetection(tabId).then(() => {
+      return runDetection(tabId).then((techs) => {
         pendingScans.get(tabId)?.();
         pendingScans.delete(tabId);
+        return techs;
       });
     }
     case "getTab":

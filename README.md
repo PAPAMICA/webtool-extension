@@ -42,7 +42,7 @@ Everything needed for submission is documented in [`AMO.md`](AMO.md) (listing co
 
 ```bash
 ./scripts/package.sh
-# → web-ext-artifacts/webtool_inspector-1.0.0.zip
+# → web-ext-artifacts/webtool_inspector-1.1.2.zip
 ```
 
 Then upload that ZIP at [addons.mozilla.org/developers](https://addons.mozilla.org/developers/addon/submit/).  

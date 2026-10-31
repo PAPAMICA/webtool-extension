@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
   "name": "WebTool Inspector",
-  "version": "1.1.2",
-  "description": "Technologies, IP, ASN, WHOIS/RDAP, DNS, TLS certificate and HTTP headers for the current site \u2014 at a glance.",
+  "version": "1.4.0",
+  "description": "Technologies, IP, ASN, WHOIS/RDAP, DNS, TLS certificate and HTTP headers for the current site — at a glance.",
   "author": "PAPAMICA",
   "homepage_url": "https://github.com/PAPAMICA/webtool-extension",
   "icons": {
@@ -28,10 +28,13 @@
     "webRequestBlocking",
     "tabs",
     "dns",
-    "cookies"
+    "cookies",
+    "storage"
   ],
   "background": {
     "scripts": [
+      "src/lib/api.js",
+      "src/lib/settings.js",
       "src/lib/technologies.js",
       "src/lib/detector.js",
       "src/lib/x509.js",
@@ -47,6 +50,8 @@
         "https://*/*"
       ],
       "js": [
+        "src/lib/api.js",
+        "src/lib/settings.js",
         "src/lib/technologies.js",
         "src/content/collect.js"
       ],

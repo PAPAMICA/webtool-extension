@@ -8,7 +8,7 @@
   <a href="#"><img src="https://readme-typing-svg.herokuapp.com?center=true&vCenter=true&lines=WebTool+Inspector;"></a>
 </p>
 <p align="center">
-    Firefox extension for everyday web investigation and development. </br>
+    Firefox &amp; Chrome extension for everyday web investigation and development. </br>
 Technologies, IP / ASN, WHOIS / RDAP, DNS, TLS certificate and HTTP headers — all in one popup.
 </p>
 
@@ -22,41 +22,47 @@ Technologies, IP / ASN, WHOIS / RDAP, DNS, TLS certificate and HTTP headers — 
 | **Tech** | 500+ technology signatures with versions when available |
 | **IP / ASN** | Contacted IP, geolocation, ASN / ISP, reverse DNS, IP RDAP |
 | **Domain** | Registrar, dates, DNSSEC, nameservers + A / AAAA / NS / MX / SPF / DMARC / CAA / SOA |
-| **Certificate** | TLS version, cipher, SAN, key, fingerprints, chain, PEM export |
+| **Certificate** | Firefox: live TLS + chain/PEM · Chrome: HTTPS/HSTS + Certificate Transparency (crt.sh) |
 | **Headers** | Redirect chain, security header checklist, info-leak headers, raw response |
+| **Export** | Full report as JSON or printable HTML (Save as PDF from the browser) |
 
 Also includes quick links to OSINT tools (Shodan, Censys, VirusTotal, crt.sh, SSL Labs, and more), prefilled with the current host / IP / ASN.
 
-## Install (temporary — development)
+## Install — Firefox (temporary)
 
-1. Open `about:debugging#/runtime/this-firefox` in Firefox
-2. Click **Load Temporary Add-on…**
-3. Select `manifest.json` from this folder
-4. Reload open tabs — certificate and headers are captured during page load
+1. Open `about:debugging#/runtime/this-firefox`
+2. **Load Temporary Add-on…** → select `manifest.json` at the repo root
+3. Reload open tabs — certificate and headers are captured during page load
 
-Temporary add-ons are removed when Firefox restarts.
-
-## Publish on Firefox Add-ons (AMO)
-
-Everything needed for submission is documented in [`AMO.md`](AMO.md) (listing copy, reviewer notes, checklist).
+## Install — Chrome (unpacked)
 
 ```bash
-./scripts/package.sh
-# → web-ext-artifacts/webtool_inspector-1.1.2.zip
+./scripts/package-chrome.sh
+unzip -d /tmp/webtool-chrome web-ext-artifacts/webtool_inspector_chrome-1.4.0.zip
 ```
 
-Then upload that ZIP at [addons.mozilla.org/developers](https://addons.mozilla.org/developers/addon/submit/).  
+1. Open `chrome://extensions` → enable **Developer mode**
+2. **Load unpacked** → select `/tmp/webtool-chrome`
+3. Reload the tab, then open the popup
+
+## Publish
+
+| Store | Guide | Package command |
+| --- | --- | --- |
+| Firefox AMO | [`AMO.md`](AMO.md) | `./scripts/package.sh` → `webtool_inspector-1.4.0.zip` |
+| Chrome Web Store | [`CHROME.md`](CHROME.md) | `./scripts/package-chrome.sh` → `webtool_inspector_chrome-1.4.0.zip` |
+
 Privacy policy: [`PRIVACY.md`](PRIVACY.md).
 
 ## Privacy note
 
-Lookups for IP geolocation / ASN, DNS-over-HTTPS and RDAP contact third-party services (Cloudflare DoH, ipwho.is, ipinfo.io, rdap.org). Technology logos load from Simple Icons / favicon CDN. No API keys are required. See [PRIVACY.md](PRIVACY.md).
+Lookups for IP geolocation / ASN, DNS-over-HTTPS and RDAP contact third-party services (Cloudflare DoH, ipwho.is, ipinfo.io, rdap.org). Chrome may query crt.sh for Certificate Transparency. Technology logos load from Simple Icons / favicon CDN. See [PRIVACY.md](PRIVACY.md).
 
 ## Stack
 
-- Manifest V2 (required for Firefox `webRequest.getSecurityInfo`)
-- Custom technology detector (headers, cookies, meta, JS globals, DOM, scripts, CDN URLs, WordPress assets)
-- Built-in X.509 DER parser for certificate details beyond the Firefox security API
+- Firefox: Manifest V2 (`webRequest.getSecurityInfo` for live TLS)
+- Chrome: Manifest V3 service worker
+- Shared UI + technology detector (headers, cookies, meta, JS globals, DOM, scripts, CDN URLs, WordPress assets)
 
 ## License
 

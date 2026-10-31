@@ -6,6 +6,21 @@ const tabs = new Map();
 const pendingScans = new Map();
 const FILTER = { urls: ["<all_urls>"], types: ["main_frame"] };
 
+let settingsCache = { autoScan: true, blacklist: [] };
+async function refreshSettings() {
+  try {
+    settingsCache = await WT_settings.get();
+  } catch (e) {}
+}
+refreshSettings();
+browser.storage?.onChanged?.addListener((changes, area) => {
+  if (area === "local" && changes[WT_settings.KEY]) refreshSettings();
+});
+
+function blockedUrl(url) {
+  return WT_settings.isBlacklisted(url, settingsCache.blacklist);
+}
+
 function headerMap(list) {
   const out = {};
   for (const { name, value } of list || []) {
@@ -61,6 +76,10 @@ function processSecurity(info) {
 browser.webRequest.onBeforeRequest.addListener(
   (d) => {
     if (d.tabId < 0) return;
+    if (blockedUrl(d.url)) {
+      tabs.delete(d.tabId);
+      return;
+    }
     const r = tabs.get(d.tabId);
     if (r && r.requestId === d.requestId) {
       r.url = d.url;
@@ -89,6 +108,7 @@ browser.webRequest.onBeforeRedirect.addListener(
 
 browser.webRequest.onHeadersReceived.addListener(
   async (d) => {
+    if (blockedUrl(d.url)) return {};
     const r = tabs.get(d.tabId);
     if (!r || r.requestId !== d.requestId) return {};
     r.statusCode = d.statusCode;
@@ -229,6 +249,16 @@ function updateBadge(tabId, n) {
 }
 
 async function rescan(tabId) {
+  await refreshSettings();
+  let tabUrl = tabs.get(tabId)?.url;
+  try {
+    const t = await browser.tabs.get(tabId);
+    tabUrl = t.url || tabUrl;
+  } catch (e) {}
+  if (tabUrl && blockedUrl(tabUrl)) {
+    throw new Error("This site is on your blacklist. Remove it in Settings to scan.");
+  }
+
   const wait = new Promise((resolve) => {
     const timer = setTimeout(() => {
       pendingScans.delete(tabId);
@@ -240,6 +270,9 @@ async function rescan(tabId) {
     });
   });
   try {
+    await browser.tabs.executeScript(tabId, { code: "globalThis.__wtForceCollect = true;" });
+    await browser.tabs.executeScript(tabId, { file: "/src/lib/api.js" });
+    await browser.tabs.executeScript(tabId, { file: "/src/lib/settings.js" });
     await browser.tabs.executeScript(tabId, { file: "/src/lib/technologies.js" });
     await browser.tabs.executeScript(tabId, { file: "/src/content/collect.js" });
   } catch (e) {
@@ -266,6 +299,7 @@ browser.runtime.onMessage.addListener((msg, sender) => {
     case "signals": {
       const tabId = sender.tab?.id;
       if (tabId == null || sender.frameId !== 0) return;
+      if (msg.signals?.url && blockedUrl(msg.signals.url)) return;
       let r = tabs.get(tabId);
       if (!r) {
         r = { url: msg.signals.url, redirects: [], techs: [], partial: true };
@@ -282,6 +316,13 @@ browser.runtime.onMessage.addListener((msg, sender) => {
       return Promise.resolve(publicRecord(msg.tabId));
     case "rescan":
       return rescan(msg.tabId);
+    case "getSettings":
+      return refreshSettings().then(() => settingsCache);
+    case "setSettings":
+      return WT_settings.set(msg.settings || {}).then((s) => {
+        settingsCache = s;
+        return s;
+      });
     case "dns":
       return WT_lookup.dns(msg.host);
     case "ip":

@@ -26,6 +26,7 @@
       <button data-tab="domain">Domain</button>
       <button data-tab="cert">Certificate</button>
       <button data-tab="headers">Headers</button>
+      <button data-tab="settings" title="Settings">⚙</button>
     </nav>
 
     <main id="main">
@@ -35,10 +36,14 @@
       <section id="panel-domain" class="panel"></section>
       <section id="panel-cert" class="panel"></section>
       <section id="panel-headers" class="panel"></section>
+      <section id="panel-settings" class="panel"></section>
     </main>
 
     <div id="toast" class="toast"></div>
+    <script src="../lib/api.js"></script>
+    <script src="../lib/settings.js"></script>
     <script src="../lib/logos.js"></script>
+    <script src="report.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

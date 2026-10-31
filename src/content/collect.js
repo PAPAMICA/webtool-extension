@@ -1,12 +1,14 @@
 /* Collect page signals for technology detection
  * (globals, DOM, meta, scripts…) and send them to the background. */
 (() => {
+  const page = window.wrappedJSObject || window;
+  const forced = !!globalThis.__wtForceCollect;
+  globalThis.__wtForceCollect = false;
+
   if (globalThis.__wtCollect) {
-    globalThis.__wtCollect();
+    if (forced) globalThis.__wtCollect();
     return;
   }
-
-  const page = window.wrappedJSObject || window;
 
   function resolvePath(path) {
     let cur = page;
@@ -178,9 +180,37 @@
       .catch(() => {});
   }
 
-  globalThis.__wtCollect = collect;
-  collect();
-  if (document.readyState !== "complete") window.addEventListener("load", () => setTimeout(collect, 300), { once: true });
-  setTimeout(collect, 3000);
-  setTimeout(collect, 8000);
+  async function boot() {
+    let settings = { autoScan: true, blacklist: [] };
+    try {
+      if (globalThis.WT_settings) settings = await WT_settings.get();
+    } catch (e) {}
+
+    if (WT_settings?.isBlacklisted?.(location.href, settings.blacklist)) {
+      globalThis.__wtCollect = () => {};
+      return;
+    }
+
+    globalThis.__wtCollect = collect;
+
+    browser.runtime.onMessage.addListener((msg) => {
+      if (msg?.type === "collectNow") {
+        collect();
+        return Promise.resolve({ ok: true });
+      }
+    });
+
+    if (!forced && settings.autoScan === false) return;
+
+    collect();
+    if (settings.autoScan !== false) {
+      if (document.readyState !== "complete") {
+        window.addEventListener("load", () => setTimeout(collect, 300), { once: true });
+      }
+      setTimeout(collect, 3000);
+      setTimeout(collect, 8000);
+    }
+  }
+
+  boot();
 })();

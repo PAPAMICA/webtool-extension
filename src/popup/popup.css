@@ -90,6 +90,7 @@ a:hover { text-decoration: underline; }
   font: inherit; font-weight: 600; font-size: 12px; cursor: pointer; border-bottom: 2px solid transparent;
   white-space: nowrap;
 }
+.tabs button[data-tab="settings"] { flex: 0 0 34px; font-size: 14px; padding-left: 0; padding-right: 0; }
 .tabs button:hover { color: var(--text); }
 .tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
 .count {
@@ -284,6 +285,42 @@ td.hv { font-family: var(--mono); font-size: 11px; overflow-wrap: anywhere; whit
 .notice .grow { flex: 1; }
 
 .empty { padding: 24px; text-align: center; color: var(--muted); }
+
+/* ───── Settings ───── */
+.settings-mode {
+  display: grid; gap: 8px;
+}
+.mode-opt {
+  display: grid; grid-template-columns: 18px 1fr; gap: 10px; align-items: start;
+  padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--card2); cursor: pointer; text-align: left; color: inherit; font: inherit;
+}
+.mode-opt:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.mode-opt.on {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--card2));
+}
+.mode-opt input { margin-top: 3px; accent-color: var(--accent); }
+.mode-opt strong { display: block; font-size: 12.5px; margin-bottom: 2px; }
+.mode-opt span { display: block; font-size: 11px; color: var(--muted); line-height: 1.4; }
+
+.bl-add { display: flex; gap: 6px; margin-top: 8px; }
+.bl-add input {
+  flex: 1; min-width: 0; padding: 7px 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; font-size: 12px;
+}
+.bl-add input:focus { outline: none; border-color: var(--accent); }
+.bl-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.bl-row {
+  display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center;
+  padding: 7px 10px; border-radius: 8px; background: var(--card2); border: 1px solid var(--border);
+}
+.bl-row code { font-family: var(--mono); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bl-row button {
+  border: 0; background: transparent; color: var(--bad); cursor: pointer; font: inherit; font-size: 11.5px; font-weight: 600;
+}
+.bl-row button:hover { text-decoration: underline; }
+.bl-hint { margin-top: 8px; font-size: 11px; color: var(--faint); line-height: 1.45; }
 
 .toast {
   position: fixed; left: 50%; bottom: 14px; transform: translate(-50%, 20px); opacity: 0;

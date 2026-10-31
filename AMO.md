@@ -1,6 +1,6 @@
 # Firefox Add-ons (AMO) — submission kit
 
-Package ready to upload: `web-ext-artifacts/webtool_inspector-1.1.2.zip`  
+Package ready to upload: `web-ext-artifacts/webtool_inspector-1.4.0.zip`  
 Rebuild anytime: `./scripts/package.sh`
 
 ## 1. Account
@@ -15,7 +15,7 @@ Rebuild anytime: `./scripts/package.sh`
 2. Choose distribution:
    - **On this site** — listed on AMO (recommended)
    - **On your own** — signed `.xpi` only, unlisted
-3. Upload `web-ext-artifacts/webtool_inspector-1.1.2.zip`
+3. Upload `web-ext-artifacts/webtool_inspector-1.4.0.zip`
 4. Compatible platforms: **Firefox** (desktop). Skip Android unless you later add `gecko_android`.
 5. Source code: **No** (this package is readable JS, not minified/obfuscated)
 

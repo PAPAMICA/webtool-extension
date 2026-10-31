@@ -9,6 +9,8 @@ const state = {
   ips: {},
   selectedIp: null,
   domain: null,
+  settings: { autoScan: true, blacklist: [] },
+  blocked: false,
 };
 
 const SECURITY_HEADERS = [
@@ -197,8 +199,12 @@ function renderHero() {
   const pills = [];
   const sec = r?.security;
   if (sec) {
-    if (sec.state === "secure") pills.push(pill(sec.protocolVersion || "TLS", "ok", sec.cipherSuite));
-    else if (sec.state === "insecure") pills.push(pill("Unencrypted HTTP", "bad"));
+    if (sec.state === "secure") {
+      const tip = sec.limited
+        ? sec.note || "Live TLS details unavailable in this browser"
+        : sec.cipherSuite;
+      pills.push(pill(sec.protocolVersion || "HTTPS", "ok", tip));
+    } else if (sec.state === "insecure") pills.push(pill("Unencrypted HTTP", "bad"));
     else pills.push(pill(`TLS ${sec.state}`, "warn", sec.errorMessage));
   } else if (state.url?.startsWith("http:")) {
     pills.push(pill("Unencrypted HTTP", "bad"));
@@ -310,14 +316,235 @@ function renderOverview() {
     ], { ico: "🛡️", extra: h("a", { onclick: () => switchTab("headers") }, "Details") });
   }
 
+  const exportCard = card("Export report", [
+    h("div", { class: "muted small", style: "margin-bottom:8px" },
+      "Full scan as JSON, or printable HTML you can save as PDF from the browser print dialog."),
+    h("div", { style: "display:flex;gap:6px;flex-wrap:wrap" },
+      h("button", { class: "btn primary", onclick: () => exportReport("json") }, "Download JSON"),
+      h("button", { class: "btn", onclick: () => exportReport("html") }, "Open HTML report"),
+      h("button", { class: "btn", onclick: () => exportReport("html-print") }, "Print / PDF")),
+  ], { ico: "📤" });
+
   panel.replaceChildren(
     hosting,
     techCard,
     certCard,
     domainCard,
     secCard || card("Security headers", h("div", { class: "muted small" }, "Reload the page to analyze headers."), { ico: "🛡️" }),
+    exportCard,
     card("OSINT tools", quickLinks(), { ico: "🔎" })
   );
+}
+
+function buildReportData() {
+  const r = state.record;
+  const hs = headersObj(r?.responseHeaders);
+  const sec = r?.security;
+  const leaf = sec?.certificates?.[0];
+  const g = currentGeo();
+  const ipInfo = state.ips[state.selectedIp];
+  const dom = state.domain?.data;
+  const d = state.dns;
+
+  const core = SECURITY_HEADERS.filter((s) => s.core);
+  const present = core.filter((s) => hs[s.h] || s.alt?.(hs));
+
+  const certs = (sec?.certificates || []).map((c, i) => {
+    const p = c.parsed || {};
+    const start = c.validity?.start;
+    const end = c.validity?.end;
+    return {
+      index: i,
+      subject: c.subject,
+      issuer: c.issuer,
+      validFrom: start ? fmtDateTime(start) : null,
+      validTo: end ? fmtDateTime(end) : null,
+      daysLeft: end != null ? daysLeft(end) : null,
+      serialNumber: c.serialNumber || null,
+      sha256: c.fingerprint?.sha256 || null,
+      sha1: c.fingerprint?.sha1 || null,
+      spkiSha256: c.spkiSha256 || null,
+      san: p.san || [],
+      publicKey: p.keyType
+        ? `${p.keyType}${p.keySize ? " " + p.keySize + " bits" : ""}${p.keyCurve ? " " + p.keyCurve : ""}`
+        : null,
+      signatureAlgorithm: p.signatureAlgorithm || null,
+      pem: c.pem || null,
+      fromCt: !!c.fromCt,
+      isBuiltInRoot: !!c.isBuiltInRoot,
+    };
+  });
+
+  return {
+    meta: {
+      tool: "WebTool Inspector",
+      extensionVersion: browser.runtime.getManifest?.()?.version || null,
+      generatedAt: new Date().toISOString(),
+      pageTitle: r?.pageTitle || state.tab?.title || null,
+    },
+    site: {
+      host: state.host,
+      url: state.url,
+      registrableDomain: registrable(state.host),
+    },
+    summary: {
+      pills: [...document.querySelectorAll("#pills .pill")].map((el) => el.textContent.replace(/\s+/g, " ").trim()),
+      securityScore: r?.responseHeaders ? `${present.length}/${core.length} core headers` : null,
+    },
+    technologies: (state.techs || []).map((t) => ({
+      name: t.name,
+      version: t.version || null,
+      tag: t.tag || null,
+      category: catLabel(t),
+      categoryKey: t.cat,
+      via: t.via || [],
+      confidence: t.confidence,
+      implied: !!t.implied,
+      impliedBy: t.impliedBy || null,
+      website: t.website || null,
+    })),
+    ip: {
+      selected: state.selectedIp || null,
+      contacted: r?.ip || null,
+      geo: g
+        ? {
+            ip: g.ip,
+            country: g.country,
+            countryCode: g.countryCode,
+            region: g.region,
+            city: g.city,
+            postal: g.postal,
+            lat: g.lat,
+            lon: g.lon,
+            timezone: g.timezone,
+            asn: g.asn,
+            org: g.org,
+            isp: g.isp,
+            asDomain: g.asDomain,
+            source: g.source,
+          }
+        : ipInfo?.geo?.error
+          ? { error: ipInfo.geo.error }
+          : null,
+      ptr: Array.isArray(ipInfo?.ptr) ? ipInfo.ptr : ipInfo?.ptr?.error ? { error: ipInfo.ptr.error } : null,
+      rdap: ipInfo?.rdap && !ipInfo.rdap.error
+        ? {
+            name: ipInfo.rdap.name,
+            range: ipInfo.rdap.range,
+            cidr: ipInfo.rdap.cidr,
+            org: ipInfo.rdap.org,
+            handle: ipInfo.rdap.handle,
+          }
+        : ipInfo?.rdap?.error
+          ? { error: ipInfo.rdap.error }
+          : null,
+    },
+    dns: d
+      ? {
+          host: d.host,
+          domain: d.domain,
+          a: d.a,
+          aaaa: d.aaaa,
+          cname: d.cname,
+          ns: d.ns,
+          mx: d.mx,
+          txt: d.txt,
+          caa: d.caa,
+          soa: d.soa,
+          dmarc: d.dmarc,
+        }
+      : null,
+    domain: state.domain?.error
+      ? { error: state.domain.error }
+      : dom
+        ? {
+            domain: dom.domain,
+            registrar: dom.registrar?.name || null,
+            registrarUrl: dom.registrar?.url || null,
+            created: dom.created ? fmtDateTime(dom.created) : null,
+            updated: dom.updated ? fmtDateTime(dom.updated) : null,
+            expires: dom.expires ? fmtDateTime(dom.expires) : null,
+            dnssec: dom.dnssec,
+            nameservers: dom.nameservers || [],
+            status: dom.status || [],
+          }
+        : null,
+    certificate: sec
+      ? {
+          state: sec.state,
+          protocolVersion: sec.protocolVersion || null,
+          cipherSuite: sec.cipherSuite || null,
+          keaGroupName: sec.keaGroupName || null,
+          signatureSchemeName: sec.signatureSchemeName || null,
+          hsts: !!sec.hsts,
+          limited: !!sec.limited,
+          note: sec.note || null,
+          certificateTransparencyStatus: sec.certificateTransparencyStatus || null,
+          certificates: certs,
+        }
+      : null,
+    securityHeaders: SECURITY_HEADERS.map((s) => {
+      const val = hs[s.h];
+      const alt = !val && s.alt?.(hs);
+      const weak = val && s.good && !s.good.test(val);
+      let status = "missing";
+      let statusClass = s.core ? "bad" : "muted";
+      if (val && !weak) {
+        status = "present";
+        statusClass = "ok";
+      } else if (alt) {
+        status = "covered";
+        statusClass = "ok";
+      } else if (weak) {
+        status = "weak";
+        statusClass = "warn";
+      }
+      return {
+        header: s.h,
+        label: s.label,
+        core: !!s.core,
+        status,
+        statusClass,
+        value: val || null,
+        note: alt || null,
+        description: s.desc,
+      };
+    }),
+    headers: {
+      statusCode: r?.statusCode || null,
+      statusLine: r?.statusLine || null,
+      finalUrl: r?.url || state.url,
+      redirects: (r?.redirects || []).map((x) => ({ status: x.status, url: x.url, ip: x.ip || null })),
+      raw: (r?.responseHeaders || []).map(({ name, value }) => ({ name, value })),
+      leaks: LEAK_HEADERS.filter((k) => hs[k]).map((k) => ({ name: k, value: hs[k] })),
+    },
+  };
+}
+
+async function exportReport(kind) {
+  if (state.blocked) {
+    toast("Site is blacklisted");
+    return;
+  }
+  if (state.scanning) {
+    toast("Wait for the scan to finish");
+    return;
+  }
+  const report = buildReportData();
+  try {
+    if (kind === "json") {
+      const name = WT_report.exportJson(report);
+      toast(`Downloaded ${name}`);
+    } else if (kind === "html-print") {
+      await WT_report.exportHtml(report, { print: true });
+      toast("Opening printable report…");
+    } else {
+      await WT_report.exportHtml(report, { print: false });
+      toast("Report opened in a new tab");
+    }
+  } catch (e) {
+    toast(e.message || "Export failed");
+  }
 }
 
 function quickLinks() {
@@ -616,25 +843,59 @@ function renderCert() {
   const leaf = certs[0];
   const out = [];
 
+  if (sec.limited) {
+    out.push(h("div", { class: "notice warn" },
+      h("span", { class: "grow" }, sec.note || "Live TLS handshake details are not available in Chrome. Certificate data below comes from public Certificate Transparency logs when found.")));
+  }
+
   const ctLabels = {
     not_configured: "Not checked",
     policy_compliant: "Compliant (valid SCTs)",
     policy_not_enough_scts: "Non-compliant: not enough SCTs",
     policy_not_diverse_scts: "Non-compliant: SCTs not diverse",
+    ct_log: "From CT logs (crt.sh) — may differ from the live cert",
   };
   out.push(card("Connection", [
     kv("State", h("span", { class: sec.state === "secure" ? "ok" : "warn" }, sec.state === "secure" ? "Secure" : sec.state), { raw: true }),
     kv("Protocol", sec.protocolVersion, { mono: true }),
-    kv("Cipher suite", sec.cipherSuite, { mono: true }),
-    kv("Key exchange", sec.keaGroupName, { mono: true }),
-    kv("Signature", sec.signatureSchemeName, { mono: true }),
+    sec.cipherSuite ? kv("Cipher suite", sec.cipherSuite, { mono: true }) : null,
+    sec.keaGroupName ? kv("Key exchange", sec.keaGroupName, { mono: true }) : null,
+    sec.signatureSchemeName ? kv("Signature", sec.signatureSchemeName, { mono: true }) : null,
     kv("HSTS", sec.hsts ? h("span", { class: "ok" }, "Yes") : "No", { raw: !!sec.hsts, copyable: false }),
-    kv("Cert. Transparency", ctLabels[sec.certificateTransparencyStatus] ?? sec.certificateTransparencyStatus, { copyable: false }),
+    sec.certificateTransparencyStatus
+      ? kv("Cert. Transparency", ctLabels[sec.certificateTransparencyStatus] ?? sec.certificateTransparencyStatus, { copyable: false })
+      : null,
     sec.usedEch ? kv("ECH", h("span", { class: "ok" }, "Encrypted Client Hello"), { raw: true }) : null,
     sec.isExtendedValidation ? kv("Validation", h("span", { class: "ok" }, "EV (Extended Validation)"), { raw: true }) : null,
     sec.weaknessReasons?.length ? kv("Weaknesses", sec.weaknessReasons.join(", ")) : null,
     sec.errorMessage ? kv("Error", h("span", { class: "bad" }, sec.errorMessage), { raw: true }) : null,
-  ], { ico: "🔐" }));
+    sec.ctError ? kv("CT lookup", h("span", { class: "warn" }, sec.ctError), { raw: true }) : null,
+  ].filter(Boolean), { ico: "🔐" }));
+
+  if (sec.limited && !leaf) {
+    out.push(card("Certificate", [
+      h("div", { class: "muted small" }, "No Certificate Transparency entry loaded yet."),
+      h("div", { style: "margin-top:8px;display:flex;gap:6px;flex-wrap:wrap" },
+        h("button", {
+          class: "btn",
+          onclick: async () => {
+            try {
+              const security = await browser.runtime.sendMessage({ type: "certCt", tabId: state.tab.id });
+              if (security && state.record) {
+                state.record.security = security;
+                renderAll();
+              }
+            } catch (e) {
+              toast(e.message || "CT lookup failed");
+            }
+          },
+        }, "Fetch from crt.sh"),
+        ext(`https://crt.sh/?q=${encodeURIComponent(state.host)}`, "Open crt.sh ↗"),
+        ext(`https://www.ssllabs.com/ssltest/analyze.html?d=${encodeURIComponent(state.host)}&hideResults=on`, "SSL Labs ↗")),
+    ], { ico: "📜" }));
+    panel.replaceChildren(...out);
+    return;
+  }
 
   if (leaf) {
     const p = leaf.parsed || {};
@@ -647,7 +908,8 @@ function renderCert() {
     const key = p.keyType ? `${p.keyType}${p.keySize ? " " + p.keySize + " bits" : ""}${p.keyCurve ? " " + p.keyCurve : ""}` : null;
     const san = p.san || [];
 
-    out.push(card("Site certificate", [
+    out.push(card(leaf.fromCt ? "Certificate (Transparency log)" : "Site certificate", [
+      leaf.fromCt ? h("div", { class: "muted small", style: "margin-bottom:6px" }, "From public CT logs (crt.sh) — may not match the certificate currently served.") : null,
       kv("Common name (CN)", subj.CN?.[0], { mono: true }),
       subj.O ? kv("Organization", subj.O.join(", ")) : null,
       kv("Issuer", [iss.O?.[0], iss.CN?.[0]].filter(Boolean).join(" — ") || leaf.issuer),
@@ -692,7 +954,7 @@ function renderCert() {
           h("div", null,
             h("div", { style: "font-weight:600" }, dnName(c.subject)),
             h("div", { class: "small muted" },
-              [i === 0 ? "Site certificate" : root ? (c.isBuiltInRoot ? "Firefox trust root" : "Root") : "Intermediate",
+              [i === 0 ? (c.fromCt ? "CT log entry" : "Site certificate") : root ? (c.isBuiltInRoot ? "Browser trust root" : "Root") : "Intermediate",
                end ? `expires ${fmtDate(end)}${left < 30 ? ` (${left}d)` : ""}` : null,
                c.parsed?.keyType ? `${c.parsed.keyType}${c.parsed.keySize ? " " + c.parsed.keySize : ""}${c.parsed.keyCurve ? " " + c.parsed.keyCurve : ""}` : null].filter(Boolean).join(" · "))));
       })), { ico: "⛓️" }));
@@ -768,12 +1030,156 @@ function switchTab(name) {
 
 function renderAll() {
   renderHero();
+  if (state.blocked) {
+    renderBlocked();
+    renderSettings();
+    return;
+  }
   renderOverview();
   renderTech();
   renderIp();
   renderDomain();
   renderCert();
   renderHeaders();
+  renderSettings();
+}
+
+function renderBlocked() {
+  for (const id of ["panel-overview", "panel-tech", "panel-ip", "panel-domain", "panel-cert", "panel-headers"]) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.replaceChildren(
+      h("div", { class: "notice warn" },
+        h("span", { class: "grow" }, "This site is on your blacklist. The extension does not collect data here."),
+        h("button", {
+          class: "btn",
+          onclick: async () => {
+            const host = state.host;
+            const next = state.settings.blacklist.filter((p) => {
+              const pl = p.toLowerCase();
+              return pl !== host.toLowerCase() && pl !== `*.${host.toLowerCase()}`;
+            });
+            await saveSettings({ blacklist: next });
+            state.blocked = false;
+            for (const b of document.querySelectorAll("#tabs button")) {
+              if (b.dataset.tab !== "settings") b.style.display = "";
+            }
+            document.getElementById("refresh").style.display = "";
+            switchTab("overview");
+            renderAll();
+            doRescan();
+          },
+        }, "Unblock host"))
+    );
+  }
+}
+
+async function saveSettings(partial) {
+  const next = await browser.runtime.sendMessage({ type: "setSettings", settings: { ...state.settings, ...partial } });
+  state.settings = next || { ...state.settings, ...partial };
+  toast("Settings saved");
+  renderSettings();
+  return state.settings;
+}
+
+function renderSettings() {
+  const panel = document.getElementById("panel-settings");
+  if (!panel) return;
+  const s = state.settings || { autoScan: true, blacklist: [] };
+
+  const mode = card("Data collection", h("div", { class: "settings-mode" },
+    h("label", { class: `mode-opt${s.autoScan ? " on" : ""}` },
+      h("input", {
+        type: "radio",
+        name: "scan-mode",
+        checked: !!s.autoScan,
+        onchange: () => saveSettings({ autoScan: true }),
+      }),
+      h("div", null,
+        h("strong", null, "Automatic"),
+        h("span", null, "Collect technologies, headers and lookups as soon as the page loads."))),
+    h("label", { class: `mode-opt${!s.autoScan ? " on" : ""}` },
+      h("input", {
+        type: "radio",
+        name: "scan-mode",
+        checked: !s.autoScan,
+        onchange: () => saveSettings({ autoScan: false }),
+      }),
+      h("div", null,
+        h("strong", null, "Manual"),
+        h("span", null, "Nothing is collected until you open the extension popup — then data loads automatically.")))),
+  { ico: "⚡" });
+
+  const list = s.blacklist.length
+    ? h("div", { class: "bl-list" }, s.blacklist.map((p) =>
+        h("div", { class: "bl-row" },
+          h("code", null, p),
+          h("button", {
+            type: "button",
+            onclick: () => saveSettings({ blacklist: s.blacklist.filter((x) => x !== p) }),
+          }, "Remove"))))
+    : h("div", { class: "muted small", style: "margin-top:8px" }, "No blacklisted sites yet.");
+
+  const input = h("input", {
+    type: "text",
+    placeholder: "example.com or https://example.com/app",
+    value: "",
+  });
+  const addPattern = async () => {
+    const v = input.value.trim();
+    if (!v) return;
+    if (s.blacklist.some((x) => x.toLowerCase() === v.toLowerCase())) {
+      toast("Already blacklisted");
+      return;
+    }
+    input.value = "";
+    await saveSettings({ blacklist: [...s.blacklist, v] });
+    if (state.url && WT_settings.isBlacklisted(state.url, [...s.blacklist, v])) {
+      state.blocked = true;
+      renderAll();
+    }
+  };
+
+  const blacklist = card("URL blacklist", [
+    h("div", { class: "muted small" }, "The extension will not run or collect data on matching sites."),
+    h("div", { class: "bl-add" },
+      input,
+      h("button", { class: "btn primary", type: "button", onclick: addPattern }, "Add"),
+      state.host && !state.blocked
+        ? h("button", {
+            class: "btn",
+            type: "button",
+            title: "Blacklist current host",
+            onclick: async () => {
+              await saveSettings({ blacklist: [...s.blacklist, state.host] });
+              state.blocked = true;
+              for (const b of document.querySelectorAll("#tabs button")) {
+                if (b.dataset.tab !== "settings") b.style.display = "none";
+              }
+              document.getElementById("refresh").style.display = "none";
+              switchTab("settings");
+              renderAll();
+            },
+          }, "This site")
+        : null),
+    list,
+    h("div", { class: "bl-hint" },
+      "Examples: ", h("code", null, "example.com"), " (host + subdomains), ",
+      h("code", null, "*.example.com"), ", ",
+      h("code", null, "example.com/admin"), ", ",
+      h("code", null, "https://app.example.com/")),
+  ], { ico: "🚫" });
+
+  const exportCard = card("Export report", [
+    h("div", { class: "muted small", style: "margin-bottom:8px" },
+      "Export the current scan (also available on Overview)."),
+    h("div", { style: "display:flex;gap:6px;flex-wrap:wrap" },
+      h("button", { class: "btn primary", onclick: () => exportReport("json") }, "JSON"),
+      h("button", { class: "btn", onclick: () => exportReport("html") }, "HTML"),
+      h("button", { class: "btn", onclick: () => exportReport("html-print") }, "Print / PDF")),
+  ], { ico: "📤" });
+
+  panel.replaceChildren(mode, blacklist, exportCard);
 }
 
 function reloadTab() {
@@ -826,12 +1232,23 @@ async function init() {
   document.getElementById("favicon").src = tab.favIconUrl || "../../icons/icon.svg";
   document.getElementById("favicon").onerror = (e) => (e.target.src = "../../icons/icon.svg");
 
-  if (!url || !/^https?:$/.test(url.protocol)) {
-    document.getElementById("host").textContent = tab.title || "Page non analysable";
+  try {
+    state.settings = (await browser.runtime.sendMessage({ type: "getSettings" })) || WT_settings.DEFAULTS;
+  } catch (e) {
+    state.settings = { autoScan: true, blacklist: [] };
+  }
+
+  for (const b of document.querySelectorAll("#tabs button")) b.addEventListener("click", () => switchTab(b.dataset.tab));
+
+  if (!url || (url.protocol !== "http:" && url.protocol !== "https:")) {
+    document.getElementById("host").textContent = tab.title || "Unsupported page";
     document.getElementById("url").textContent = tab.url || "";
-    document.getElementById("tabs").style.display = "none";
     document.getElementById("refresh").style.display = "none";
-    document.getElementById("main").replaceChildren(h("div", { class: "empty" }, "This page cannot be analyzed.", h("br"), h("span", { class: "small faint" }, "Only http:// and https:// pages are supported.")));
+    for (const b of document.querySelectorAll("#tabs button")) {
+      if (b.dataset.tab !== "settings") b.style.display = "none";
+    }
+    switchTab("settings");
+    renderSettings();
     return;
   }
 
@@ -840,19 +1257,32 @@ async function init() {
   document.getElementById("host").textContent = url.hostname;
   document.getElementById("url").textContent = tab.title ? `${tab.title} — ${url.href}` : url.href;
 
-  for (const b of document.querySelectorAll("#tabs button")) b.addEventListener("click", () => switchTab(b.dataset.tab));
   document.getElementById("refresh").addEventListener("click", () => {
+    if (state.blocked) return;
     state.ips = {};
     doRescan();
     if (state.selectedIp) selectIp(state.selectedIp);
   });
 
+  if (WT_settings.isBlacklisted(state.url, state.settings.blacklist)) {
+    state.blocked = true;
+    state.techs = [];
+    for (const b of document.querySelectorAll("#tabs button")) {
+      if (b.dataset.tab !== "settings") b.style.display = "none";
+    }
+    document.getElementById("refresh").style.display = "none";
+    switchTab("settings");
+    renderAll();
+    return;
+  }
+
   state.record = await browser.runtime.sendMessage({ type: "getTab", tabId: tab.id });
   if (state.record?.hasSignals && Array.isArray(state.record.techs)) state.techs = state.record.techs;
   renderAll();
 
-  /* Always rescan when nothing was detected yet (stale tab, failed inject, etc.). */
-  if (!state.record?.hasSignals || !state.techs?.length) doRescan();
+  /* Auto: page already scanned on load. Manual: scan when the popup opens. */
+  const needsScan = !state.record?.hasSignals || !state.techs?.length;
+  if (needsScan || !state.settings.autoScan) doRescan();
 
   if (isIP(state.host)) {
     selectIp(state.host);

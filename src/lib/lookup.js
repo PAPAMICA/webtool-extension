@@ -81,8 +81,12 @@
     return cached(`dns:${host}`, async () => {
       const domain = registrableDomain(host);
       const zone = domain || host;
+      const systemDns =
+        typeof browser.dns?.resolve === "function"
+          ? settle(browser.dns.resolve(host, ["canonical_name"]))
+          : Promise.resolve({ error: "unavailable" });
       const [system, a, aaaa, cname, ns, mx, txt, caa, soa, dmarc] = await Promise.all([
-        settle(browser.dns.resolve(host, ["canonical_name"])),
+        systemDns,
         settle(doh(host, "A")),
         settle(doh(host, "AAAA")),
         settle(dohChain(host)),

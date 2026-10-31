@@ -1,6 +1,6 @@
 # Privacy Policy — WebTool Inspector
 
-**Last updated:** 2026-10-24  
+**Last updated:** 2026-10-29  
 **Developer:** PAPAMICA  
 **Contact:** https://papamica.com  
 **Source:** https://github.com/PAPAMICA/webtool-extension
@@ -8,15 +8,15 @@
 ## Summary
 
 WebTool Inspector helps you inspect the website currently open in your browser (technologies, IP / ASN, DNS, WHOIS / RDAP, TLS certificate, HTTP headers).  
-It does **not** create user accounts, does **not** sell data, and does **not** use advertising or tracking SDKs.
+It is available for **Firefox** and **Chrome**. It does **not** create user accounts, does **not** sell data, and does **not** use advertising or tracking SDKs.
 
 ## Data handled locally
 
-The following stays in your browser (extension memory for the active tab / session):
+The following stays in your browser (extension memory / session storage for the active tab):
 
 - Page HTML signals used for technology detection (scripts, meta tags, cookies names, DOM hints)
 - HTTP response headers and redirect chain captured during page load
-- TLS certificate details obtained via Firefox `webRequest.getSecurityInfo`
+- TLS certificate details from Firefox `webRequest.getSecurityInfo` (Firefox only)
 - Technology match results shown in the popup
 
 No browsing history database is built or synced by this extension.
@@ -34,6 +34,7 @@ When you open the popup on a site, the extension may send **network lookups** so
 | Same origin as the current tab | Public paths (e.g. WordPress feed / login) | Best-effort version probes |
 | `cdn.simpleicons.org` | Technology icon slug | Display technology logos in the UI |
 | `www.google.com/s2/favicons` | Technology website hostname | Favicon fallback when no Simple Icon exists |
+| `crt.sh` (Chrome) | Hostname | Optional Certificate Transparency lookup (Chrome cannot read the live TLS handshake) |
 
 These requests are made with `credentials: "omit"` where applicable. The extension does **not** attach your Firefox account, cookies from other sites, or form passwords to those requests.
 

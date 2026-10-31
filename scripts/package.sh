@@ -19,7 +19,7 @@ cp icons/icon-48.png icons/icon-96.png icons/icon-128.png icons/icon.svg "$TMP/i
 cp src/background.js "$TMP/src/"
 cp src/lib/*.js "$TMP/src/lib/"
 cp src/content/*.js "$TMP/src/content/"
-cp src/popup/popup.html src/popup/popup.js src/popup/popup.css "$TMP/src/popup/"
+cp src/popup/popup.html src/popup/popup.js src/popup/popup.css src/popup/report.js "$TMP/src/popup/"
 
 (
   cd "$TMP"

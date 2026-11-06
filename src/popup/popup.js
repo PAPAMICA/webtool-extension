@@ -13,6 +13,9 @@ const state = {
   blocked: false,
 };
 
+/* Firefox exposes runtime.getBrowserInfo; Chrome (after the api.js alias) does not. */
+const IS_CHROME = typeof browser.runtime.getBrowserInfo !== "function";
+
 const SECURITY_HEADERS = [
   { h: "strict-transport-security", label: "Strict-Transport-Security", desc: "Enforces HTTPS (HSTS)", core: true },
   { h: "content-security-policy", label: "Content-Security-Policy", desc: "Restricts content sources (XSS, injection)", core: true },
@@ -74,13 +77,60 @@ function toast(msg) {
   toast.timer = setTimeout(() => t.classList.remove("show"), 1400);
 }
 
-async function copy(text) {
+function copyWithExecCommand(text) {
+  const prev = document.activeElement;
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;";
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  let ok = false;
   try {
-    await navigator.clipboard.writeText(text);
-    toast(`Copied: ${text.length > 60 ? text.slice(0, 60) + "…" : text}`);
-  } catch (e) {
-    toast("Unable to copy");
+    ok = document.execCommand("copy");
+  } finally {
+    ta.remove();
+    if (prev && prev.focus) prev.focus();
   }
+  if (!ok) throw new Error("copy failed");
+}
+
+async function copy(text) {
+  const value = String(text);
+  const preview = value.length > 60 ? value.slice(0, 60) + "…" : value;
+  let ok = false;
+  try {
+    copyWithExecCommand(value);
+    ok = true;
+  } catch (e) {}
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value);
+      ok = true;
+    } catch (e) {}
+  }
+  toast(ok ? `Copied: ${preview}` : "Unable to copy");
+}
+
+function bindCopy(el, raw, title) {
+  const value = String(raw);
+  el.classList.add("copy");
+  el.setAttribute("role", "button");
+  el.tabIndex = 0;
+  const base = (title != null ? String(title) : el.getAttribute("title") || "").trim();
+  el.title = base ? `${base} — Click to copy` : "Click to copy";
+  el.setAttribute("aria-label", `Copy ${value}`);
+  const activate = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    copy(value);
+  };
+  el.addEventListener("click", activate);
+  el.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") activate(e);
+  });
+  return el;
 }
 
 const cp = (text, display, cls = "") =>
@@ -117,7 +167,11 @@ function kv(label, value, { mono, copyable = true, raw } = {}) {
 
 const loading = (msg = "Loading…") => h("div", { class: "loading" }, h("span", { class: "spinner" }), msg);
 const errorLine = (msg) => h("div", { class: "notice bad" }, msg);
-const pill = (text, kind = "", title) => h("span", { class: `pill ${kind}`, title }, h("span", { class: "dot" }), text);
+const pill = (text, kind = "", title, raw) => {
+  const el = h("span", { class: `pill ${kind}`, title }, h("span", { class: "dot" }), text);
+  if (raw != null && raw !== "") bindCopy(el, raw, title);
+  return el;
+};
 
 // ───────────── Formatting ─────────────
 const DAY = 86400000;
@@ -203,7 +257,8 @@ function renderHero() {
       const tip = sec.limited
         ? sec.note || "Live TLS details unavailable in this browser"
         : sec.cipherSuite;
-      pills.push(pill(sec.protocolVersion || "HTTPS", "ok", tip));
+      const proto = sec.protocolVersion || "HTTPS";
+      pills.push(pill(proto, "ok", tip, proto));
     } else if (sec.state === "insecure") pills.push(pill("Unencrypted HTTP", "bad"));
     else pills.push(pill(`TLS ${sec.state}`, "warn", sec.errorMessage));
   } else if (state.url?.startsWith("http:")) {
@@ -217,11 +272,11 @@ function renderHero() {
   }
   if (state.selectedIp) {
     const g = currentGeo();
-    pills.push(pill(`${g ? flag(g.countryCode) + " " : ""}${state.selectedIp}`, "info", g ? `${g.city || ""} ${g.country || ""}` : ""));
+    pills.push(pill(`${g ? flag(g.countryCode) + " " : ""}${state.selectedIp}`, "info", g ? `${g.city || ""} ${g.country || ""}` : "", state.selectedIp));
     const ptr = state.ips[state.selectedIp]?.ptr;
-    if (Array.isArray(ptr) && ptr.length) pills.push(pill(ptr[0], "info", "Reverse DNS (PTR)"));
+    if (Array.isArray(ptr) && ptr.length) pills.push(pill(ptr[0], "info", "Reverse DNS (PTR)", ptr[0]));
     const org = g?.org || g?.isp;
-    if (org) pills.push(pill(org, "", g.isp && g.isp !== org ? `ISP: ${g.isp}` : "Organization"));
+    if (org) pills.push(pill(org, "", g.isp && g.isp !== org ? `ISP: ${g.isp}` : "Organization", org));
   }
   if (r?.redirects?.length) pills.push(pill(`${r.redirects.length} redirect${r.redirects.length > 1 ? "s" : ""}`, "warn"));
   document.getElementById("pills").replaceChildren(...pills);
@@ -249,6 +304,7 @@ function renderOverview() {
     g ? kv("Organization", g.org || g.isp) : null,
     g && g.isp && g.isp !== g.org ? kv("ISP", g.isp) : null,
     ipInfo?.ptr && !ipInfo.ptr.error ? kv("Reverse DNS", ipInfo.ptr[0] || null, { mono: true }) : null,
+    state.record?.viaProxy ? h("div", { class: "muted small" }, "Via proxy — site IP from DNS.") : null,
   ], { ico: "🌍" });
 
   let domainBody;
@@ -312,18 +368,9 @@ function renderOverview() {
         h("span", { class: `big ${ratio >= 0.8 ? "ok" : ratio >= 0.5 ? "warn" : "bad"}` }, `${present.length}/${core.length}`),
         h("div", { class: "score-bar" }, core.map((s) => h("i", { class: present.includes(s) ? "on" : "", title: s.label })))),
       h("div", { class: "chips", style: "margin-top:8px" },
-        core.filter((s) => !present.includes(s)).map((s) => h("span", { class: "chip", title: s.desc }, h("span", { class: "bad" }, "✕"), s.label))),
+        core.filter((s) => !present.includes(s)).map((s) => bindCopy(h("span", { class: "chip" }, h("span", { class: "bad" }, "✕"), s.label), s.label, s.desc))),
     ], { ico: "🛡️", extra: h("a", { onclick: () => switchTab("headers") }, "Details") });
   }
-
-  const exportCard = card("Export report", [
-    h("div", { class: "muted small", style: "margin-bottom:8px" },
-      "Full scan as JSON, or printable HTML you can save as PDF from the browser print dialog."),
-    h("div", { style: "display:flex;gap:6px;flex-wrap:wrap" },
-      h("button", { class: "btn primary", onclick: () => exportReport("json") }, "Download JSON"),
-      h("button", { class: "btn", onclick: () => exportReport("html") }, "Open HTML report"),
-      h("button", { class: "btn", onclick: () => exportReport("html-print") }, "Print / PDF")),
-  ], { ico: "📤" });
 
   panel.replaceChildren(
     hosting,
@@ -331,7 +378,6 @@ function renderOverview() {
     certCard,
     domainCard,
     secCard || card("Security headers", h("div", { class: "muted small" }, "Reload the page to analyze headers."), { ico: "🛡️" }),
-    exportCard,
     card("OSINT tools", quickLinks(), { ico: "🔎" })
   );
 }
@@ -405,7 +451,7 @@ function buildReportData() {
     })),
     ip: {
       selected: state.selectedIp || null,
-      contacted: r?.ip || null,
+      contacted: r?.viaProxy || r?.ipSource === "dns" ? null : r?.ip || null,
       geo: g
         ? {
             ip: g.ip,
@@ -683,9 +729,13 @@ function renderIp() {
 
   out.push(card("IP addresses", [
     ipChips,
-    state.record?.ip ? h("div", { class: "small muted", style: "margin-top:6px" }, `IP actually contacted by Firefox: ${state.record.ip}`) : null,
+    state.record?.viaProxy
+      ? h("div", { class: "small muted", style: "margin-top:6px" }, "Via proxy — site IP from DNS.")
+      : state.record?.ip && state.record.ipSource !== "dns"
+        ? h("div", { class: "small muted", style: "margin-top:6px" }, `${IS_CHROME ? "IP actually contacted" : "IP actually contacted by Firefox"}: ${state.record.ip}`)
+        : null,
     d?.cname && !d.cname.error && d.cname.length ? kv("CNAME chain", d.cname.join(" → "), { mono: true }) : null,
-    d?.system?.isTRR != null ? kv("Resolver", d.system.isTRR ? "DNS over HTTPS (Firefox TRR)" : "System resolver", { copyable: false }) : null,
+    d?.system?.isTRR != null ? kv("Resolver", d.system.isTRR ? (IS_CHROME ? "DNS over HTTPS" : "DNS over HTTPS (Firefox TRR)") : "System resolver", { copyable: false }) : null,
   ], { ico: "📍" }));
 
   const info = state.ips[state.selectedIp];
@@ -734,11 +784,19 @@ function renderIp() {
   panel.replaceChildren(...out);
 }
 
+function hiddenIp(ip) {
+  const list = state.record?.ignoreIps;
+  if (!ip || !list?.length || typeof WT_lookup?.canonicalIp !== "function") return false;
+  const c = WT_lookup.canonicalIp(ip);
+  if (!c) return false;
+  return list.some((x) => WT_lookup.canonicalIp(x) === c);
+}
+
 function allIps() {
   const list = [];
   const seen = new Set();
   const push = (ip, src, connected) => {
-    if (!ip) return;
+    if (!ip || hiddenIp(ip)) return;
     if (seen.has(ip)) {
       if (connected) list.find((x) => x.ip === ip).connected = true;
       return;
@@ -746,13 +804,15 @@ function allIps() {
     seen.add(ip);
     list.push({ ip, src, connected });
   };
-  if (state.record?.ip) push(state.record.ip, "Contacted IP", true);
+  if (state.record?.ip && !state.record.viaProxy && state.record.ipSource !== "dns") {
+    push(state.record.ip, "Contacted IP", true);
+  }
   if (isIP(state.host)) push(state.host.replace(/^\[|\]$/g, ""), "URL");
   const d = state.dns;
   if (d) {
     for (const a of Array.isArray(d.a) ? d.a : []) push(a.data, "A (DoH)");
     for (const a of Array.isArray(d.aaaa) ? d.aaaa : []) push(a.data, "AAAA (DoH)");
-    for (const a of d.system?.addresses || []) push(a, "Firefox resolver");
+    for (const a of d.system?.addresses || []) push(a, IS_CHROME ? "System resolver" : "Firefox resolver");
   }
   return list;
 }
@@ -785,7 +845,7 @@ function renderDomain() {
       kv("Last changed", d.updated ? `${fmtDate(d.updated)} — ${relative(d.updated)}` : null, { copyable: false }),
       kv("Expires", d.expires ? h("span", { class: left < 30 ? "bad" : left < 90 ? "warn" : "ok" }, `${fmtDate(d.expires)} — ${relative(d.expires)}`) : null, { raw: !!d.expires }),
       kv("DNSSEC", d.dnssec == null ? null : d.dnssec ? h("span", { class: "ok" }, "Delegation signed") : "Unsigned", { raw: d.dnssec === true, copyable: false }),
-      kv("Statuses", d.status.length ? h("div", { class: "chips" }, d.status.map((s) => h("span", { class: "chip" }, s))) : null, { raw: d.status.length > 0 }),
+      kv("Statuses", d.status.length ? h("div", { class: "chips" }, d.status.map((s) => bindCopy(h("span", { class: "chip" }, s), s))) : null, { raw: d.status.length > 0 }),
       kv("Nameservers", d.nameservers.length ? h("div", null, d.nameservers.map((n) => h("div", null, cp(n, null, "mono")))) : null, { raw: d.nameservers.length > 0 }),
       d.whoisServer ? kv("WHOIS server", d.whoisServer, { mono: true }) : null,
       h("div", { class: "small", style: "margin-top:6px;text-align:right" }, ext(d.rdapUrl, "Raw RDAP response ↗")),
@@ -845,7 +905,7 @@ function renderCert() {
 
   if (sec.limited) {
     out.push(h("div", { class: "notice warn" },
-      h("span", { class: "grow" }, sec.note || "Live TLS handshake details are not available in Chrome. Certificate data below comes from public Certificate Transparency logs when found.")));
+      h("span", { class: "grow" }, sec.note || "The live TLS handshake is not available. This tab shows HTTPS/HSTS plus Certificate Transparency (crt.sh).")));
   }
 
   const ctLabels = {
@@ -921,9 +981,9 @@ function renderCert() {
             left < 0 ? `Expired ${-left} days ago` : `${left} days left · lifetime ${Math.round((end - start) / DAY)} days`))),
       kv(`SAN (${san.length + (p.sanIps?.length || 0)})`, san.length || p.sanIps?.length
         ? h("div", null,
-            h("div", { class: "chips" }, [...san, ...(p.sanIps || [])].slice(0, 24).map((n) => h("span", { class: "chip mono copy", onclick: () => copy(n) }, n))),
+            h("div", { class: "chips" }, [...san, ...(p.sanIps || [])].slice(0, 24).map((n) => bindCopy(h("span", { class: "chip mono" }, n), n))),
             san.length > 24 ? h("details", null, h("summary", null, `Show ${san.length - 24} more`),
-              h("div", { class: "chips", style: "margin-top:6px" }, san.slice(24).map((n) => h("span", { class: "chip mono copy", onclick: () => copy(n) }, n)))) : null)
+              h("div", { class: "chips", style: "margin-top:6px" }, san.slice(24).map((n) => bindCopy(h("span", { class: "chip mono" }, n), n)))) : null)
         : null, { raw: !!(san.length || p.sanIps?.length) }),
       kv("Public key", key, { mono: true }),
       kv("Signature algorithm", p.signatureAlgorithm, { mono: true }),
@@ -1025,6 +1085,7 @@ function renderHeaders() {
 function switchTab(name) {
   for (const b of document.querySelectorAll("#tabs button")) b.classList.toggle("active", b.dataset.tab === name);
   for (const p of document.querySelectorAll(".panel")) p.classList.toggle("active", p.id === `panel-${name}`);
+  document.getElementById("footer-settings")?.classList.toggle("active", name === "settings");
   document.getElementById("main").scrollTop = 0;
 }
 
@@ -1064,6 +1125,7 @@ function renderBlocked() {
             for (const b of document.querySelectorAll("#tabs button")) {
               if (b.dataset.tab !== "settings") b.style.display = "";
             }
+            document.getElementById("tabs").style.display = "";
             document.getElementById("refresh").style.display = "";
             switchTab("overview");
             renderAll();
@@ -1156,6 +1218,7 @@ function renderSettings() {
               for (const b of document.querySelectorAll("#tabs button")) {
                 if (b.dataset.tab !== "settings") b.style.display = "none";
               }
+              document.getElementById("tabs").style.display = "none";
               document.getElementById("refresh").style.display = "none";
               switchTab("settings");
               renderAll();
@@ -1170,16 +1233,18 @@ function renderSettings() {
       h("code", null, "https://app.example.com/")),
   ], { ico: "🚫" });
 
-  const exportCard = card("Export report", [
-    h("div", { class: "muted small", style: "margin-bottom:8px" },
-      "Export the current scan (also available on Overview)."),
-    h("div", { style: "display:flex;gap:6px;flex-wrap:wrap" },
-      h("button", { class: "btn primary", onclick: () => exportReport("json") }, "JSON"),
-      h("button", { class: "btn", onclick: () => exportReport("html") }, "HTML"),
-      h("button", { class: "btn", onclick: () => exportReport("html-print") }, "Print / PDF")),
-  ], { ico: "📤" });
+  panel.replaceChildren(mode, blacklist);
+}
 
-  panel.replaceChildren(mode, blacklist, exportCard);
+function wireFooter() {
+  document.getElementById("footer-settings")?.addEventListener("click", () => switchTab("settings"));
+  document.getElementById("export-json")?.addEventListener("click", () => exportReport("json"));
+  document.getElementById("export-html")?.addEventListener("click", () => exportReport("html"));
+  document.getElementById("export-pdf")?.addEventListener("click", () => exportReport("html-print"));
+  document.getElementById("footer-credit")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    browser.tabs.create({ url: "https://genevois-informatique.com" });
+  });
 }
 
 function reloadTab() {
@@ -1247,6 +1312,7 @@ async function init() {
     for (const b of document.querySelectorAll("#tabs button")) {
       if (b.dataset.tab !== "settings") b.style.display = "none";
     }
+    document.getElementById("tabs").style.display = "none";
     switchTab("settings");
     renderSettings();
     return;
@@ -1270,6 +1336,7 @@ async function init() {
     for (const b of document.querySelectorAll("#tabs button")) {
       if (b.dataset.tab !== "settings") b.style.display = "none";
     }
+    document.getElementById("tabs").style.display = "none";
     document.getElementById("refresh").style.display = "none";
     switchTab("settings");
     renderAll();
@@ -1302,6 +1369,8 @@ async function init() {
     });
   }
 }
+
+wireFooter();
 
 init().catch((e) => {
   document.getElementById("main").replaceChildren(errorLine(`Error: ${e.message}`));

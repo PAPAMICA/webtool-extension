@@ -1,5 +1,5 @@
 /* Per-tab collection for the main navigation:
- * headers, contacted IP, redirect chain, TLS info,
+ * headers, site IP (DNS when a proxy is in the path), redirect chain, TLS info,
  * and signals from the content script for technology detection. */
 
 const tabs = new Map();
@@ -100,7 +100,11 @@ browser.webRequest.onBeforeRedirect.addListener(
   (d) => {
     const r = tabs.get(d.tabId);
     if (!r || r.requestId !== d.requestId) return;
-    r.redirects.push({ url: d.url, status: d.statusCode, ip: d.ip || null });
+    r.redirects.push({
+      url: d.url,
+      status: d.statusCode,
+      ip: WT_lookup.normalizeProxy(d.proxyInfo) ? null : d.ip || null,
+    });
     r.url = d.redirectUrl;
   },
   FILTER
@@ -130,9 +134,9 @@ browser.webRequest.onResponseStarted.addListener(
   (d) => {
     const r = tabs.get(d.tabId);
     if (!r || r.requestId !== d.requestId) return;
-    r.ip = d.ip || null;
     r.fromCache = d.fromCache;
     r.completedAt = Date.now();
+    WT_lookup.observeConnection(r, d);
   },
   FILTER
 );
@@ -283,10 +287,11 @@ async function rescan(tabId) {
   return publicRecord(tabId);
 }
 
-function publicRecord(tabId) {
+async function publicRecord(tabId) {
   const r = tabs.get(tabId);
   if (!r) return null;
-  const { signals, ...rest } = r;
+  await WT_lookup.ensureSiteIp(r);
+  const { signals, connectionIp, proxy, siteIpGen, ...rest } = r;
   return {
     ...rest,
     hasSignals: !!signals,
@@ -313,7 +318,7 @@ browser.runtime.onMessage.addListener((msg, sender) => {
       });
     }
     case "getTab":
-      return Promise.resolve(publicRecord(msg.tabId));
+      return publicRecord(msg.tabId);
     case "rescan":
       return rescan(msg.tabId);
     case "getSettings":

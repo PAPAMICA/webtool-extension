@@ -26,7 +26,6 @@
       <button data-tab="domain">Domain</button>
       <button data-tab="cert">Certificate</button>
       <button data-tab="headers">Headers</button>
-      <button data-tab="settings" title="Settings">⚙</button>
     </nav>
 
     <main id="main">
@@ -39,8 +38,19 @@
       <section id="panel-settings" class="panel"></section>
     </main>
 
+    <footer class="popup-footer">
+      <button type="button" id="footer-settings" class="btn" title="Settings">Settings</button>
+      <span class="footer-exports">
+        <button type="button" id="export-json" class="btn" title="Download JSON">JSON</button>
+        <button type="button" id="export-html" class="btn" title="Open HTML report">HTML</button>
+        <button type="button" id="export-pdf" class="btn" title="Print / PDF">PDF</button>
+      </span>
+      <a id="footer-credit" class="footer-credit" href="https://genevois-informatique.com">Genèvois Informatique</a>
+    </footer>
+
     <div id="toast" class="toast"></div>
     <script src="../lib/api.js"></script>
+    <script src="../lib/lookup.js"></script>
     <script src="../lib/settings.js"></script>
     <script src="../lib/logos.js"></script>
     <script src="report.js"></script>

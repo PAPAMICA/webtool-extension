@@ -51,7 +51,7 @@ Open the toolbar button on any http(s) page to get:
 • Tech — 500+ signatures (CMS, frameworks, CDNs, analytics…) with versions when available
 • IP / ASN — contacted IP, geolocation, ASN/ISP, reverse DNS, IP RDAP
 • Domain — registrar, dates, DNSSEC, nameservers + A/AAAA/NS/MX/SPF/DMARC/CAA/SOA
-• Certificate — HTTPS/HSTS plus Certificate Transparency data (Chrome cannot expose the live TLS handshake; use Firefox for full live cert details)
+• Certificate — HTTPS/HSTS plus Certificate Transparency (crt.sh). The live TLS handshake is not available.
 • Headers — redirect chain, security-header checklist, info-leak headers, raw response
 
 Also includes quick links to OSINT tools (Shodan, Censys, VirusTotal, crt.sh, SSL Labs, and more).

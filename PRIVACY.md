@@ -29,8 +29,8 @@ When you open the popup on a site, the extension may send **network lookups** so
 | --- | --- | --- |
 | `cloudflare-dns.com` (DNS-over-HTTPS) | Host / domain names of the current site | Resolve A / AAAA / NS / MX / TXT / CAA / SOA / DMARC |
 | `rdap.org` (and related RDAP servers) | Domain or IP | WHOIS-like registration data |
-| `ipwho.is` | Contacted IP address | Geolocation, ASN / ISP |
-| `ipinfo.io` | Contacted IP address (fallback) | Geolocation / ASN if the primary provider fails |
+| `ipwho.is` | Site IP address (the DNS address when a proxy sits in front of the site) | Geolocation, ASN / ISP |
+| `ipinfo.io` | Site IP address (fallback) | Geolocation / ASN if the primary provider fails |
 | Same origin as the current tab | Public paths (e.g. WordPress feed / login) | Best-effort version probes |
 | `cdn.simpleicons.org` | Technology icon slug | Display technology logos in the UI |
 | `www.google.com/s2/favicons` | Technology website hostname | Favicon fallback when no Simple Icon exists |

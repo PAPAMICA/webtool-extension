@@ -1,4 +1,5 @@
-/* Chrome MV3 service worker — same features as Firefox background, without getSecurityInfo. */
+/* Chrome MV3 service worker — same features as Firefox background, without getSecurityInfo.
+ * Chrome rarely exposes proxyInfo; a peer IP that is not a DNS A/AAAA is treated as not the origin. */
 importScripts(
   "/src/lib/api.js",
   "/src/lib/settings.js",
@@ -92,7 +93,7 @@ function limitedSecurity(url, responseHeaders) {
     state: https ? "secure" : "insecure",
     protocolVersion: https ? "TLS" : null,
     hsts: !!hs["strict-transport-security"],
-    note: "Chrome does not expose the live TLS handshake to extensions. Showing connection hints from the URL and headers; Certificate Transparency can fill certificate details.",
+    note: "The live TLS handshake is not available. This tab shows HTTPS/HSTS plus Certificate Transparency (crt.sh).",
     certificates: [],
   };
 }
@@ -185,7 +186,11 @@ browser.webRequest.onBeforeRequest.addListener((d) => {
 browser.webRequest.onBeforeRedirect.addListener((d) => {
   const r = tabs.get(d.tabId);
   if (!r || r.requestId !== d.requestId) return;
-  r.redirects.push({ url: d.url, status: d.statusCode, ip: d.ip || null });
+  r.redirects.push({
+    url: d.url,
+    status: d.statusCode,
+    ip: WT_lookup.normalizeProxy(d.proxyInfo) ? null : d.ip || null,
+  });
   r.url = d.redirectUrl;
   persist(d.tabId);
 }, FILTER);
@@ -208,10 +213,9 @@ browser.webRequest.onHeadersReceived.addListener(
 browser.webRequest.onResponseStarted.addListener((d) => {
   const r = tabs.get(d.tabId);
   if (!r || r.requestId !== d.requestId) return;
-  r.ip = d.ip || null;
   r.fromCache = d.fromCache;
   r.completedAt = Date.now();
-  persist(d.tabId);
+  WT_lookup.observeConnection(r, d).then(() => persist(d.tabId), () => persist(d.tabId));
 }, FILTER);
 
 browser.webRequest.onErrorOccurred.addListener((d) => {
@@ -376,7 +380,10 @@ async function rescan(tabId) {
 async function publicRecord(tabId) {
   const r = await loadTab(tabId);
   if (!r) return null;
-  const { signals, ...rest } = r;
+  const ready = r.siteIpReady;
+  await WT_lookup.ensureSiteIp(r);
+  if (!ready) await persist(tabId);
+  const { signals, connectionIp, proxy, siteIpGen, ...rest } = r;
   return {
     ...rest,
     hasSignals: !!signals,
